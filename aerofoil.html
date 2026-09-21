@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AeroMech AeroFoil | Flow Dynamics Simulator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        /* ORTAK TEMA VE RENK PALETİ (SİSTEM STANDARDI) */
+        :root {
+            --bg: #0b1120; 
+            --panel: #1e293b; 
+            --primary: #38bdf8; 
+            --primary-hover: #0ea5e9;
+            --primary-glow: rgba(56, 189, 248, 0.15);
+            --danger: #ef4444; 
+            --success: #10b981;
+            --warning: #f59e0b;
+            --lift: #8b5cf6; /* Kaldırma (Lift) Vektör Rengi */
+            --drag: #ef4444; /* Sürüklenme (Drag) Vektör Rengi */
+            --text: #f8fafc; 
+            --muted: #94a3b8;
+            --border: #334155;
+            --input-bg: rgba(15, 23, 42, 0.6);
+            --grid-color: rgba(255, 255, 255, 0.05);
+        }
+
+        body.light-theme {
+            --bg: #f8fafc; 
+            --panel: #ffffff; 
+            --primary: #0284c7; 
+            --primary-hover: #0369a1;
+            --primary-glow: rgba(2, 132, 199, 0.15);
+            --danger: #dc2626; 
+            --success: #059669;
+            --warning: #d97706;
+            --lift: #6d28d9;
+            --drag: #b91c1c;
+            --text: #0f172a; 
+            --muted: #64748b;
+            --border: #e2e8f0;
+            --input-bg: #f1f5f9;
+            --grid-color: rgba(0, 0, 0, 0.05);
+        }
+
+        body { 
+            font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); 
+            margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* NAVBAR */
+        .navbar {
+            padding: 15px 30px; background: rgba(11, 17, 32, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; z-index: 100;
+        }
+        body.light-theme .navbar { background: rgba(255, 255, 255, 0.9); }
+        .brand { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+        .header-actions { display: flex; gap: 10px; align-items: center; }
+        .action-btn { 
+            background: transparent; color: var(--muted); border: 1px solid var(--border); padding: 8px 16px; 
+            border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 12px; transition: all 0.2s; font-family: 'Inter', sans-serif;
+        }
+        .action-btn:hover, .action-btn.active { color: var(--text); background: var(--panel); border-color: var(--primary); }
+
+        /* ANA YAPI */
+        .container { display: flex; flex: 1; overflow: hidden; width: 100%; }
+
+        /* SOL PANEL (GİRDİ & KONTROL) */
+        .sidebar {
+            width: 440px; background: var(--panel); border-right: 1px solid var(--border);
+            display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0;
+            transition: background-color 0.3s; z-index: 10; padding-bottom: 100px;
+        }
+        .sidebar-section { padding: 20px; border-bottom: 1px solid var(--border); }
+        .section-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+
+        /* GİRDİ FORMLARI */
+        .input-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+        .input-grid-2 label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 6px; font-weight: 500; }
+        .input-grid-2 input { 
+            width: 100%; padding: 10px; background: var(--input-bg); border: 1px solid var(--border); 
+            color: var(--text); border-radius: 6px; box-sizing: border-box; font-family: 'Fira Code', monospace; font-size: 13px;
+        }
+        .input-grid-2 input:focus { outline: none; border-color: var(--primary); }
+        
+        /* SLIDER (HÜCUM AÇISI) */
+        .slider-container { margin-bottom: 15px; background: var(--input-bg); padding: 15px; border-radius: 8px; border: 1px solid var(--border); }
+        .slider-header { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 10px; }
+        .val-badge { color: var(--primary); font-family: 'Fira Code', monospace; }
+        input[type=range] { width: 100%; -webkit-appearance: none; background: transparent; height: 6px; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; background: var(--border); border-radius: 3px; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 18px; width: 18px; border-radius: 50%; background: var(--primary); cursor: pointer; margin-top: -6px; box-shadow: 0 0 10px var(--primary-glow); }
+
+        /* İSTATİSTİKLER VE GRAFİK */
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;}
+        .stat-card { background: var(--input-bg); border: 1px solid var(--border); padding: 12px; border-radius: 8px; position:relative; overflow:hidden;}
+        .stat-card span { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; font-weight: 500;}
+        .stat-card strong { font-size: 16px; font-family: 'Fira Code', monospace; color: var(--text); }
+        .stat-card.lift { border-color: var(--lift); background: rgba(139, 92, 246, 0.1); }
+        .stat-card.lift strong { color: var(--lift); }
+        .stat-card.drag { border-color: var(--danger); background: rgba(239, 68, 68, 0.1); }
+        .stat-card.drag strong { color: var(--danger); }
+
+        .mini-graph { width: 100%; height: 120px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
+
+        /* SAĞ PANEL (CANVAS & SİMÜLASYON) */
+        .main-view { flex: 1; display: flex; flex-direction: column; background: var(--bg); position: relative; }
+        .canvas-toolbar { padding: 15px 20px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .legend { display: flex; gap: 15px; font-size: 12px; color: var(--muted); font-weight: 500; align-items: center;}
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+        .legend-color { width: 14px; height: 4px; border-radius: 2px; }
+
+        .canvas-wrapper { flex: 1; position: relative; overflow: hidden; background-color: var(--bg); }
+        canvas#airfoilCanvas { display: block; width: 100%; height: 100%; cursor: crosshair;}
+        
+        .wind-lines { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0.15; }
+
+        /* AI CHATBOT (AeroMech AI Co-Pilot) */
+        .ai-fab {
+            position: absolute; bottom: 25px; right: 25px; width: 60px; height: 60px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--primary-hover)); color: #000;
+            display: flex; justify-content: center; align-items: center; box-shadow: 0 10px 25px var(--primary-glow);
+            cursor: pointer; z-index: 1000; transition: all 0.3s; border: 2px solid rgba(255,255,255,0.2);
+        }
+        .ai-fab:hover { transform: scale(1.1); }
+        .ai-chat-window {
+            position: absolute; bottom: 95px; right: 25px; width: 380px; max-height: 500px;
+            background: rgba(11, 17, 32, 0.85); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border); border-radius: 16px; display: flex; flex-direction: column;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5); z-index: 999; transform: translateY(20px); opacity: 0;
+            pointer-events: none; transition: all 0.3s ease;
+        }
+        body.light-theme .ai-chat-window { background: rgba(255, 255, 255, 0.95); }
+        .ai-chat-window.open { transform: translateY(0); opacity: 1; pointer-events: all; }
+        .ai-header { padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; }
+        .ai-messages { padding: 20px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; min-height: 250px; }
+        .ai-msg { max-width: 85%; padding: 12px 16px; border-radius: 12px; font-size: 13px; line-height: 1.5; }
+        .msg-bot { background: var(--input-bg); border: 1px solid var(--border); align-self: flex-start; border-bottom-left-radius: 4px; }
+        .ai-analyze-btn { background: var(--primary-glow); color: var(--primary); border: 1px solid rgba(56, 189, 248, 0.3); margin: 0 20px 20px 20px; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; font-size: 13px;}
+        .ai-analyze-btn:hover { background: var(--primary); color: #000; }
+        
+        /* SCROLLBAR */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+        .tooltip { position: relative; display: inline-block; cursor: help; border-bottom: 1px dashed var(--muted);}
+        .tooltip .tooltiptext { visibility: hidden; width: 220px; background: var(--panel); color: var(--text); text-align: center; border-radius: 6px; padding: 10px; border: 1px solid var(--border); position: absolute; z-index: 1; bottom: 150%; left: 50%; transform: translateX(-50%); opacity: 0; transition: opacity 0.3s; font-size: 11px; font-weight: 400; box-shadow: 0 5px 15px rgba(0,0,0,0.3);}
+        .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
+    </style>
+</head>
+<body>
+
+    <!-- NAVBAR -->
+    <div class="navbar">
+        <div class="brand">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9.59 4.59A2 2 0 1 1 11 8H2"></path>
+                <path d="M12.59 14.41A2 2 0 1 0 14 16H2"></path>
+                <path d="M15.73 7.73A2.5 2.5 0 1 1 19.5 12H2"></path>
+            </svg>
+            AeroMech Flow Dynamics <span style="font-size:10px; color:var(--primary); background:var(--primary-glow); padding:2px 6px; border-radius:10px; margin-left:5px;">Pro</span>
+        </div>
+        <div class="header-actions">
+            <button class="action-btn active" id="unitBtn" onclick="toggleUnit()">Birim: SI (m, m/s)</button>
+            <button class="action-btn" id="themeBtn" onclick="toggleTheme()">Aydınlık Tema</button>
+            <button class="action-btn active" id="langBtn" onclick="toggleLang()">TR</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- SOL PANEL -->
+        <div class="sidebar">
+            <div class="sidebar-section">
+                <div class="section-title" id="lblParams">Kavramsal Tasarım Parametreleri</div>
+                
+                <div class="input-grid-2" style="grid-template-columns: 1fr;">
+                    <div>
+                        <label id="lblNaca">NACA Kanat Profili Kodu <span class="tooltip">i<span class="tooltiptext" id="ttNaca">Örn: 2412 (2: Maks Kamburluk, 4: Kamburluk Konumu, 12: Kalınlık oranı)</span></span></label>
+                        <input type="text" id="nacaCode" value="2412" maxlength="4" oninput="updateSimulation()">
+                    </div>
+                </div>
+
+                <div class="slider-container">
+                    <div class="slider-header">
+                        <span id="lblAoA">Hücum Açısı (Angle of Attack)</span>
+                        <span class="val-badge"><span id="aoaVal">5</span>°</span>
+                    </div>
+                    <input type="range" id="aoaSlider" min="-10" max="25" value="5" step="0.5" oninput="updateSimulation()">
+                </div>
+
+                <div class="input-grid-2">
+                    <div>
+                        <label id="lblVelocity">Hava Hızı (V)</label>
+                        <input type="number" id="velocity" value="100" oninput="updateSimulation()">
+                    </div>
+                    <div>
+                        <label id="lblChord">Veter Uzunluğu (c)</label>
+                        <input type="number" id="chord" value="1.0" step="0.1" oninput="updateSimulation()">
+                    </div>
+                    <div>
+                        <label id="lblDensity">Hava Yoğunluğu (ρ)</label>
+                        <input type="number" id="density" value="1.225" step="0.01" oninput="updateSimulation()">
+                    </div>
+                    <div>
+                        <label id="lblSpan">Kanat Açıklığı (b)</label>
+                        <input type="number" id="span" value="5.0" step="0.5" oninput="updateSimulation()">
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section" style="flex:1; border-bottom:none;">
+                <div class="section-title" id="lblResults">Aerodinamik Katsayılar ve Kuvvetler</div>
+                <div class="stats-grid">
+                    <div class="stat-card lift">
+                        <span id="lblLiftForce">Kaldırma Kuvveti (Lift)</span>
+                        <strong id="statLift">0.00</strong>
+                    </div>
+                    <div class="stat-card drag">
+                        <span id="lblDragForce">Sürüklenme (Drag)</span>
+                        <strong id="statDrag">0.00</strong>
+                    </div>
+                    <div class="stat-card">
+                        <span id="lblCL">Kaldırma Katsayısı (C_L)</span>
+                        <strong id="statCL">0.00</strong>
+                    </div>
+                    <div class="stat-card">
+                        <span id="lblCD">Sürüklenme Kat. (C_D)</span>
+                        <strong id="statCD">0.00</strong>
+                    </div>
+                    <div class="stat-card" style="grid-column: span 2; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <span id="lblEfficiency">Aerodinamik Verim (L/D Oranı)</span>
+                            <strong id="statEff" style="color:var(--success);">0.00</strong>
+                        </div>
+                        <div id="stallWarning" style="color: var(--danger); font-size: 11px; font-weight: 600; padding: 4px 8px; border: 1px solid var(--danger); border-radius: 4px; display: none;">
+                            STALL (TUTUNMA KAYBI)
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="section-title" id="lblGraphTitle" style="margin-top: 20px;">C_L vs Alpha (α) Eğrisi</div>
+                <canvas id="graphCanvas" class="mini-graph"></canvas>
+            </div>
+        </div>
+
+        <!-- SAĞ PANEL (CANVAS) -->
+        <div class="main-view">
+            <div class="canvas-toolbar">
+                <div style="font-weight:600; font-size:14px; color:var(--text);" id="lblCanvasTitle">Rüzgar Tüneli Görselleştirmesi</div>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-color" style="background: var(--lift);"></div> <span id="legLift">Lift</span></div>
+                    <div class="legend-item"><div class="legend-color" style="background: var(--drag);"></div> <span id="legDrag">Drag</span></div>
+                    <div class="legend-item"><div class="legend-color" style="background: var(--primary);"></div> <span id="legChord">Kamburluk</span></div>
+                </div>
+            </div>
+            
+            <div class="canvas-wrapper" id="canvasWrapper">
+                <!-- Rüzgar animasyon çizgileri -->
+                <div class="wind-lines" id="windLines"></div>
+                <canvas id="airfoilCanvas"></canvas>
+            </div>
+            
+            <!-- AI CHATBOT -->
+            <div class="ai-fab" onclick="toggleAIChat()">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
+                </svg>
+            </div>
+            <div class="ai-chat-window" id="aiChatWindow">
+                <div class="ai-header">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path></svg>
+                    AeroMech AI Co-Pilot
+                </div>
+                <div class="ai-messages" id="aiMessages"></div>
+                <button class="ai-analyze-btn" id="btnAIAnalyze" onclick="analyzeAeroContext()">Akış Dinamiklerini Yorumla</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // GLOBALS
+        let currentLang = 'tr';
+        let currentUnit = 'metric';
+        let isDarkTheme = true;
+        let aiChatOpen = false;
+        
+        let canvas, ctx, wrapper, graphCanvas, gCtx;
+        let airfoilCoords = { upper: [], lower: [], camber: [] };
+        let currentStats = { cl: 0, cd: 0, lift: 0, drag: 0, ld: 0, stall: false, aoaL0: 0 };
+
+        // DICTIONARY
+        const dict = {
+            tr: {
+                themeLight: "Aydınlık Tema", themeDark: "Karanlık Tema",
+                unitSI: "Birim: SI (m, m/s)", unitImp: "Birim: Imperial (ft, mph)",
+                lblParams: "Kavramsal Tasarım Parametreleri", lblNaca: "NACA Kanat Profili Kodu",
+                ttNaca: "Örn: 2412 (2: Maks Kamburluk, 4: Konum, 12: Kalınlık)",
+                lblAoA: "Hücum Açısı (Angle of Attack)", lblVelocity: "Hava Hızı (V)",
+                lblChord: "Veter Uzunluğu (c)", lblDensity: "Hava Yoğunluğu (ρ)", lblSpan: "Kanat Açıklığı (b)",
+                lblResults: "Aerodinamik Katsayılar ve Kuvvetler", lblLiftForce: "Kaldırma Kuvveti (Lift)",
+                lblDragForce: "Sürüklenme (Drag)", lblCL: "Kaldırma Katsayısı (C_L)", lblCD: "Sürüklenme Kat. (C_D)",
+                lblEfficiency: "Aerodinamik Verim (L/D Oranı)", lblGraphTitle: "C_L vs Alpha (α) Eğrisi",
+                lblCanvasTitle: "Rüzgar Tüneli Görselleştirmesi", legLift: "Lift (Kaldırma)", legDrag: "Drag (Direnç)", legChord: "Kamburluk Eğrisi",
+                btnAIAnalyze: "Akış Dinamiklerini Yorumla",
+                aiWelcome: "Merhaba! Seçtiğiniz NACA profiline ve uçuş koşullarına göre oluşan kaldırma/sürüklenme karakteristiklerini analiz edebilirim.",
+                aiWait: "Aerodinamik kuvvetler analiz ediliyor..."
+            },
+            en: {
+                themeLight: "Light Theme", themeDark: "Dark Theme",
+                unitSI: "Unit: SI (m, m/s)", unitImp: "Unit: Imperial (ft, mph)",
+                lblParams: "Conceptual Design Parameters", lblNaca: "NACA Airfoil Code",
+                ttNaca: "Ex: 2412 (2: Max Camber, 4: Position, 12: Thickness)",
+                lblAoA: "Angle of Attack (AoA)", lblVelocity: "Air Velocity (V)",
+                lblChord: "Chord Length (c)", lblDensity: "Air Density (ρ)", lblSpan: "Wing Span (b)",
+                lblResults: "Aerodynamic Coefficients & Forces", lblLiftForce: "Lift Force",
+                lblDragForce: "Drag Force", lblCL: "Lift Coefficient (C_L)", lblCD: "Drag Coefficient (C_D)",
+                lblEfficiency: "Aerodynamic Efficiency (L/D Ratio)", lblGraphTitle: "C_L vs Alpha (α) Curve",
+                lblCanvasTitle: "Wind Tunnel Visualization", legLift: "Lift Vector", legDrag: "Drag Vector", legChord: "Camber Line",
+                btnAIAnalyze: "Analyze Flow Dynamics",
+                aiWelcome: "Hello! I can analyze the lift/drag characteristics based on your selected NACA profile and flight conditions.",
+                aiWait: "Analyzing aerodynamic forces..."
+            }
+        };
+
+        // INIT
+        window.onload = function() {
+            canvas = document.getElementById('airfoilCanvas');
+            ctx = canvas.getContext('2d');
+            wrapper = document.getElementById('canvasWrapper');
+            graphCanvas = document.getElementById('graphCanvas');
+            gCtx = graphCanvas.getContext('2d');
+            
+            window.addEventListener('resize', () => { resizeCanvases(); updateSimulation(); });
+            
+            createWindLines();
+            applyTranslations();
+            resizeCanvases();
+            updateSimulation(); 
+        };
+
+        // UNIT & THEME TOGGLES
+        window.toggleLang = function() {
+            currentLang = currentLang === 'tr' ? 'en' : 'tr';
+            document.getElementById('langBtn').innerText = currentLang === 'tr' ? 'TR' : 'EN';
+            applyTranslations();
+            updateSimulation();
+        };
+
+        window.toggleTheme = function() {
+            isDarkTheme = !isDarkTheme;
+            document.body.classList.toggle('light-theme', !isDarkTheme);
+            document.getElementById('themeBtn').innerText = dict[currentLang][isDarkTheme ? 'themeLight' : 'themeDark'];
+            drawAirfoil(); drawGraph();
+        };
+
+        window.toggleUnit = function() {
+            const prev = currentUnit;
+            currentUnit = currentUnit === 'metric' ? 'imperial' : 'metric';
+            document.getElementById('unitBtn').innerText = dict[currentLang][currentUnit === 'metric' ? 'unitSI' : 'unitImp'];
+            document.getElementById('unitBtn').classList.toggle('active', currentUnit==='metric');
+            
+            // Convert inputs
+            let v = parseFloat(document.getElementById('velocity').value);
+            let c = parseFloat(document.getElementById('chord').value);
+            let d = parseFloat(document.getElementById('density').value);
+            let s = parseFloat(document.getElementById('span').value);
+            
+            if(prev === 'metric') {
+                document.getElementById('velocity').value = (v * 2.23694).toFixed(1); // m/s to mph
+                document.getElementById('chord').value = (c * 3.28084).toFixed(2); // m to ft
+                document.getElementById('density').value = (d * 0.00194032).toFixed(4); // kg/m3 to slugs/ft3
+                document.getElementById('span').value = (s * 3.28084).toFixed(2); // m to ft
+            } else {
+                document.getElementById('velocity').value = (v / 2.23694).toFixed(1);
+                document.getElementById('chord').value = (c / 3.28084).toFixed(2);
+                document.getElementById('density').value = (d / 0.00194032).toFixed(3);
+                document.getElementById('span').value = (s / 3.28084).toFixed(2);
+            }
+            updateSimulation();
+        };
+
+        function applyTranslations() {
+            const t = dict[currentLang];
+            Object.keys(t).forEach(key => {
+                const el = document.getElementById(key);
+                if(el) el.innerHTML = t[key];
+            });
+            document.getElementById('themeBtn').innerText = t[isDarkTheme ? 'themeLight' : 'themeDark'];
+            document.getElementById('unitBtn').innerText = t[currentUnit === 'metric' ? 'unitSI' : 'unitImp'];
+            document.title = currentLang === 'tr' ? "AeroMech AeroFoil | Flow Dynamics Simulator" : "AeroMech AeroFoil | Simulator";
+        }
+
+        function resizeCanvases() {
+            if(wrapper) { canvas.width = wrapper.clientWidth; canvas.height = wrapper.clientHeight; }
+            if(graphCanvas) { graphCanvas.width = graphCanvas.clientWidth; graphCanvas.height = graphCanvas.clientHeight; }
+        }
+
+        function createWindLines() {
+            const container = document.getElementById('windLines');
+            let html = '';
+            for(let i=0; i<15; i++) {
+                let top = (i / 15) * 100;
+                let speed = 2 + Math.random() * 2;
+                html += `<div style="position:absolute; top:${top}%; left:-100%; width:50%; height:1px; background:var(--primary); box-shadow: 0 0 5px var(--primary); animation: windAnim ${speed}s linear infinite; animation-delay: ${Math.random()*2}s;"></div>`;
+            }
+            container.innerHTML = html;
+            // Ekle: CSS animasyonu
+            const style = document.createElement('style');
+            style.innerHTML = `@keyframes windAnim { 0% { left: -50%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { left: 100%; opacity: 0; } }`;
+            document.head.appendChild(style);
+        }
+
+        // NACA 4-DIGIT GENERATOR MATH
+        function generateNACA(code) {
+            if(code.length !== 4 || isNaN(code)) code = "2412";
+            
+            const m = parseInt(code[0]) / 100.0; // Maks kamburluk
+            const p = parseInt(code[1]) / 10.0;  // Kamburluk konumu
+            const t = parseInt(code.substring(2, 4)) / 100.0; // Kalınlık
+            
+            let upper = [], lower = [], camber = [];
+            const numPoints = 100;
+            
+            for(let i=0; i<=numPoints; i++) {
+                // Cosine spacing for point distribution (more points at leading/trailing edges)
+                let beta = i * Math.PI / numPoints;
+                let x = (1.0 - Math.cos(beta)) / 2.0;
+                
+                // Thickness distribution yt
+                let yt = 5 * t * (0.2969 * Math.sqrt(x) - 0.1260 * x - 0.3516 * Math.pow(x,2) + 0.2843 * Math.pow(x,3) - 0.1015 * Math.pow(x,4));
+                
+                // Camber distribution yc and dyc/dx
+                let yc = 0, dyc = 0;
+                if(p > 0) {
+                    if (x >= 0 && x <= p) {
+                        yc = (m / Math.pow(p,2)) * (2 * p * x - Math.pow(x,2));
+                        dyc = (m / Math.pow(p,2)) * (2 * p - 2 * x);
+                    } else if (x > p && x <= 1.0) {
+                        yc = (m / Math.pow(1-p,2)) * (1 - 2*p + 2*p*x - Math.pow(x,2));
+                        dyc = (m / Math.pow(1-p,2)) * (2 * p - 2 * x);
+                    }
+                }
+                
+                let theta = Math.atan(dyc);
+                
+                let xu = x - yt * Math.sin(theta);
+                let yu = yc + yt * Math.cos(theta);
+                let xl = x + yt * Math.sin(theta);
+                let yl = yc - yt * Math.cos(theta);
+                
+                upper.push({x: xu, y: yu});
+                lower.push({x: xl, y: yl});
+                camber.push({x: x, y: yc});
+            }
+            return { upper, lower, camber, m, p, t };
+        }
+
+        // MAIN SIMULATION UPDATE
+        window.updateSimulation = function() {
+            let code = document.getElementById('nacaCode').value;
+            let aoa = parseFloat(document.getElementById('aoaSlider').value);
+            document.getElementById('aoaVal').innerText = aoa;
+            
+            let v = parseFloat(document.getElementById('velocity').value) || 1;
+            let c = parseFloat(document.getElementById('chord').value) || 1;
+            let d = parseFloat(document.getElementById('density').value) || 1;
+            let s = parseFloat(document.getElementById('span').value) || 1;
+            
+            airfoilCoords = generateNACA(code);
+            
+            // AERODYNAMIC CALCULATIONS (Thin Airfoil Theory Approximation)
+            // Zero-lift angle approximation for NACA 4-digit: alpha_L0 = ~ -50.6 * m (in degrees)
+            let alphaL0_deg = airfoilCoords.m === 0 ? 0 : -50.6 * airfoilCoords.m;
+            let cl_slope = 2 * Math.PI * (Math.PI/180); // per degree, ~0.11
+            
+            // Simple Stall Model (linear up to 15 deg, drops after)
+            let stallAngle = 15;
+            currentStats.stall = (aoa > stallAngle || aoa < -10);
+            
+            let cl = 0;
+            if(!currentStats.stall) {
+                cl = cl_slope * (aoa - alphaL0_deg);
+            } else {
+                // Post-stall drop
+                if(aoa > 0) cl = cl_slope * (stallAngle - alphaL0_deg) * Math.max(0, 1 - (aoa - stallAngle)*0.1);
+                else cl = cl_slope * (-10 - alphaL0_deg) * Math.max(0, 1 - Math.abs(aoa + 10)*0.1);
+            }
+            
+            // Drag Model (Parasitic + Induced)
+            let cd0 = 0.015 + (airfoilCoords.t * 0.05); // Base drag affected by thickness
+            let AR = s / c; // Aspect Ratio
+            let e = 0.8; // Oswald efficiency
+            let cd_induced = Math.pow(cl, 2) / (Math.PI * e * AR);
+            // Add massive drag if stalled
+            let stall_drag = currentStats.stall ? Math.abs(aoa)*0.01 : 0; 
+            let cd = cd0 + cd_induced + stall_drag;
+            
+            // Calculate Forces
+            // metric: v in m/s, c in m, d in kg/m3. Force in N.
+            // imperial: v in mph -> ft/s, c in ft, d in slugs/ft3. Force in lbf.
+            let v_calc = currentUnit === 'metric' ? v : (v * 1.46667); // mph to ft/s
+            let q = 0.5 * d * Math.pow(v_calc, 2); // Dynamic pressure
+            let area = c * s;
+            
+            let lift = q * area * cl;
+            let drag = q * area * cd;
+            let ld = Math.abs(cl / cd);
+            
+            currentStats = { cl, cd, lift, drag, ld, stall: currentStats.stall, aoaL0: alphaL0_deg };
+            
+            // Update UI
+            let fUnit = currentUnit === 'metric' ? ' N' : ' lbf';
+            document.getElementById('statLift').innerText = lift.toFixed(1) + fUnit;
+            document.getElementById('statDrag').innerText = drag.toFixed(1) + fUnit;
+            document.getElementById('statCL').innerText = cl.toFixed(3);
+            document.getElementById('statCD').innerText = cd.toFixed(4);
+            document.getElementById('statEff').innerText = isNaN(ld) ? "0.0" : ld.toFixed(1);
+            
+            document.getElementById('stallWarning').style.display = currentStats.stall ? 'block' : 'none';
+            
+            drawAirfoil(aoa);
+            drawGraph(aoa);
+        };
+
+        // DRAW AIRFOIL & VECTORS ON CANVAS
+        function drawAirfoil(aoa_deg) {
+            if(!ctx || !canvas) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw Grid
+            ctx.beginPath();
+            ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--grid-color').trim() || 'rgba(255,255,255,0.05)';
+            ctx.lineWidth = 1;
+            for(let i=0; i<canvas.width; i+=40) { ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); }
+            for(let i=0; i<canvas.height; i+=40) { ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); }
+            ctx.stroke();
+
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            const scale = Math.min(canvas.width, canvas.height) * 0.6; // Fit to screen
+            
+            ctx.save();
+            ctx.translate(cx, cy);
+            
+            // Invert Y and Rotate for AoA. Airfoil coords are x:0->1. We center it at x=0.25 (quarter chord).
+            // Rotation is negative because standard AoA pitches nose UP (which is clockwise in math if flow is left to right).
+            ctx.scale(1, -1);
+            ctx.rotate(-aoa_deg * Math.PI / 180);
+            
+            // Draw Filled Airfoil
+            ctx.beginPath();
+            ctx.moveTo((airfoilCoords.upper[0].x - 0.25) * scale, airfoilCoords.upper[0].y * scale);
+            for(let i=1; i<airfoilCoords.upper.length; i++) {
+                ctx.lineTo((airfoilCoords.upper[i].x - 0.25) * scale, airfoilCoords.upper[i].y * scale);
+            }
+            // Lower surface goes backwards
+            for(let i=airfoilCoords.lower.length-1; i>=0; i--) {
+                ctx.lineTo((airfoilCoords.lower[i].x - 0.25) * scale, airfoilCoords.lower[i].y * scale);
+            }
+            ctx.closePath();
+            
+            ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--panel').trim() || '#1e293b';
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--text').trim() || '#fff';
+            ctx.stroke();
+
+            // Draw Camber Line
+            ctx.beginPath();
+            ctx.moveTo((airfoilCoords.camber[0].x - 0.25) * scale, airfoilCoords.camber[0].y * scale);
+            for(let i=1; i<airfoilCoords.camber.length; i++) {
+                ctx.lineTo((airfoilCoords.camber[i].x - 0.25) * scale, airfoilCoords.camber[i].y * scale);
+            }
+            ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--primary').trim() || '#38bdf8';
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            ctx.restore();
+
+            // Draw Lift and Drag Vectors (Not rotated with airfoil, they are relative to freestream)
+            // Center of pressure approx at quarter chord (cx, cy)
+            let maxVecLen = Math.min(canvas.width, canvas.height) * 0.4;
+            let liftLen = (Math.abs(currentStats.cl) / 2.0) * maxVecLen; // normalized visual
+            let dragLen = (currentStats.cd / 0.2) * maxVecLen * 0.5;
+            
+            // Lift Vector (Upwards, Y is inverted in canvas)
+            if(liftLen > 5) {
+                let dirY = currentStats.cl > 0 ? -1 : 1;
+                drawArrow(ctx, cx, cy, cx, cy + dirY * liftLen, getComputedStyle(document.body).getPropertyValue('--lift').trim());
+            }
+            // Drag Vector (Rightwards)
+            if(dragLen > 5) {
+                drawArrow(ctx, cx, cy, cx + dragLen, cy, getComputedStyle(document.body).getPropertyValue('--drag').trim());
+            }
+        }
+
+        function drawArrow(context, fromx, fromy, tox, toy, color) {
+            let headlen = 10; 
+            let dx = tox - fromx;
+            let dy = toy - fromy;
+            let angle = Math.atan2(dy, dx);
+            context.beginPath();
+            context.moveTo(fromx, fromy);
+            context.lineTo(tox, toy);
+            context.strokeStyle = color;
+            context.lineWidth = 3;
+            context.stroke();
+            
+            context.beginPath();
+            context.moveTo(tox, toy);
+            context.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
+            context.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6));
+            context.lineTo(tox, toy);
+            context.fillStyle = color;
+            context.fill();
+        }
+
+        // DRAW C_L GRAPH
+        function drawGraph(currentAoA) {
+            if(!gCtx || !graphCanvas) return;
+            const w = graphCanvas.width;
+            const h = graphCanvas.height;
+            gCtx.clearRect(0, 0, w, h);
+            
+            // Axes
+            gCtx.beginPath();
+            gCtx.moveTo(0, h/2); gCtx.lineTo(w, h/2); // X axis
+            gCtx.moveTo(w/2, 0); gCtx.lineTo(w/2, h); // Y axis
+            gCtx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--border').trim() || '#334155';
+            gCtx.lineWidth = 1;
+            gCtx.stroke();
+            
+            // Plot C_L from -10 to +25
+            let minA = -10, maxA = 25;
+            let cl_slope = 2 * Math.PI * (Math.PI/180);
+            
+            gCtx.beginPath();
+            for(let a = minA; a <= maxA; a++) {
+                let cl = 0;
+                if(a <= 15 && a >= -10) cl = cl_slope * (a - currentStats.aoaL0);
+                else if (a > 15) cl = cl_slope * (15 - currentStats.aoaL0) * Math.max(0, 1 - (a - 15)*0.1);
+                
+                let px = ((a - minA) / (maxA - minA)) * w;
+                let py = h/2 - (cl / 2.0) * (h/2); // scale C_L=2.0 to top
+                
+                if(a === minA) gCtx.moveTo(px, py);
+                else gCtx.lineTo(px, py);
+            }
+            gCtx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--primary').trim() || '#38bdf8';
+            gCtx.lineWidth = 2;
+            gCtx.stroke();
+            
+            // Mark Current Point
+            let curPx = ((currentAoA - minA) / (maxA - minA)) * w;
+            let curPy = h/2 - (currentStats.cl / 2.0) * (h/2);
+            gCtx.beginPath();
+            gCtx.arc(curPx, curPy, 4, 0, Math.PI*2);
+            gCtx.fillStyle = getComputedStyle(document.body).getPropertyValue('--warning').trim() || '#f59e0b';
+            gCtx.fill();
+        }
+
+        // AI CO-PILOT
+        window.toggleAIChat = function() {
+            aiChatOpen = !aiChatOpen;
+            const win = document.getElementById('aiChatWindow');
+            if(!win) return;
+            if(aiChatOpen) {
+                win.classList.add('open');
+                let msgs = document.getElementById('aiMessages');
+                if(msgs && msgs.innerHTML.trim() === '') appendAIMessage('bot', dict[currentLang].aiWelcome);
+            } else {
+                win.classList.remove('open');
+            }
+        };
+
+        function appendAIMessage(sender, text) {
+            const div = document.getElementById('aiMessages');
+            if(!div) return;
+            const bubble = document.createElement('div');
+            bubble.className = `ai-msg msg-${sender}`;
+            bubble.innerHTML = text;
+            div.appendChild(bubble);
+            div.scrollTop = div.scrollHeight;
+        }
+
+        window.analyzeAeroContext = function() {
+            appendAIMessage('bot', `<span id="aiTyp">${dict[currentLang].aiWait}</span>`);
+            setTimeout(() => {
+                let typEl = document.getElementById('aiTyp');
+                if(typEl && typEl.parentNode) typEl.parentNode.remove();
+                
+                let report = "";
+                let naca = document.getElementById('nacaCode').value;
+                let aoa = document.getElementById('aoaSlider').value;
+                
+                if(currentLang === 'tr') {
+                    report = `<strong>Aerodinamik Rapor (NACA ${naca}):</strong><br><br>`;
+                    report += `Şu anki hücum açınız <strong>${aoa}°</strong>. Aerodinamik verim (L/D oranı): <strong>${currentStats.ld.toFixed(1)}</strong>.<br><br>`;
+                    if(currentStats.stall) {
+                        report += `<span style="color:var(--danger)">⚠️ STALL UYARISI: Kanat profiliniz kritik açıyı geçti ve hava akışı kanat üzerinden ayrılıyor. Kaldırma kuvveti hızla düşüyor ve sürüklenme muazzam artmış durumda.</span>`;
+                    } else if (currentStats.ld > 40) {
+                        report += `<span style="color:var(--success)">✅ Seyir Uçuşu İçin İdeal: Mükemmel bir Kaldırma/Sürüklenme oranı yakaladınız. Motor yakıt tüketimi bu konfigürasyonda optimum seviyede olacaktır.</span>`;
+                    } else if (currentStats.cl < 0) {
+                        report += `Açı sıfır kaldırma açısının (${currentStats.aoaL0.toFixed(1)}°) altında. Ters (negatif) kaldırma üretiyorsunuz. Bu durum sadece ters uçuşlarda veya pike anlarında tercih edilir.`;
+                    } else {
+                        report += `Profil şu an stabil bir kaldırma üretiyor ancak L/D oranı daha yüksek olabilir. Maksimum menzil için hücum açısını 4° ile 8° arasına getirmeyi deneyin.`;
+                    }
+                } else {
+                    report = `<strong>Aerodynamic Report (NACA ${naca}):</strong><br><br>`;
+                    report += `Current Angle of Attack: <strong>${aoa}°</strong>. Aerodynamic efficiency (L/D ratio): <strong>${currentStats.ld.toFixed(1)}</strong>.<br><br>`;
+                    if(currentStats.stall) {
+                        report += `<span style="color:var(--danger)">⚠️ STALL WARNING: The airfoil has exceeded the critical angle. Flow separation is occurring, causing a rapid loss of lift and immense drag.</span>`;
+                    } else if (currentStats.ld > 40) {
+                        report += `<span style="color:var(--success)">✅ Optimal Cruise: Excellent Lift/Drag ratio achieved. Engine fuel efficiency will be at its peak in this configuration.</span>`;
+                    } else if (currentStats.cl < 0) {
+                        report += `The angle is below the zero-lift angle (${currentStats.aoaL0.toFixed(1)}°). You are generating negative lift, typical for inverted flight or steep dives.`;
+                    } else {
+                        report += `The profile is generating stable lift, but efficiency (L/D) could be higher. Try adjusting the AoA between 4° and 8° for maximum range.`;
+                    }
+                }
+                appendAIMessage('bot', report);
+            }, 1000);
+        };
+    </script>
+</body>
+</html>
