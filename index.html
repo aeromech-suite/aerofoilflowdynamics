@@ -22,8 +22,8 @@
             --muted: #94a3b8;
             --border: #334155;
             --input-bg: rgba(15, 23, 42, 0.6);
+            --wind-color: rgba(56, 189, 248, 0.5);
             --grid-color: rgba(255, 255, 255, 0.05);
-            --wind-color: rgba(56, 189, 248, 0.4);
         }
 
         body.light-theme {
@@ -41,8 +41,8 @@
             --muted: #64748b;
             --border: #e2e8f0;
             --input-bg: #f1f5f9;
+            --wind-color: rgba(2, 132, 199, 0.4);
             --grid-color: rgba(0, 0, 0, 0.05);
-            --wind-color: rgba(2, 132, 199, 0.3);
         }
 
         body { 
@@ -83,7 +83,6 @@
         .input-grid-2 input { 
             width: 100%; padding: 10px; background: var(--input-bg); border: 1px solid var(--border); 
             color: var(--text); border-radius: 6px; box-sizing: border-box; font-family: 'Fira Code', monospace; font-size: 13px;
-            transition: border-color 0.3s;
         }
         .input-grid-2 input:focus { outline: none; border-color: var(--primary); }
         
@@ -115,8 +114,7 @@
         .legend-color { width: 14px; height: 4px; border-radius: 2px; }
 
         .canvas-wrapper { flex: 1; position: relative; overflow: hidden; background-color: var(--bg); }
-        /* Tümü tek bir canvas'a birleştirildi (Performans ve netlik için) */
-        canvas#airfoilCanvas { display: block; width: 100%; height: 100%; position: absolute; top:0; left:0; z-index: 2;}
+        canvas#airfoilCanvas { display: block; width: 100%; height: 100%; position: absolute; top:0; left:0;}
 
         /* AI CHATBOT */
         .ai-fab {
@@ -250,7 +248,7 @@
         <!-- SAĞ PANEL (CANVAS & GÖRSELLEŞTİRME) -->
         <div class="main-view">
             <div class="canvas-toolbar">
-                <div style="font-weight:600; font-size:14px; color:var(--text);" id="lblCanvasTitle">Gelişmiş CFD Rüzgar Tüneli</div>
+                <div style="font-weight:600; font-size:14px; color:var(--text);" id="lblCanvasTitle">Akışkanlar Mekaniği (CFD) Girdap Motoru</div>
                 <div class="legend">
                     <div class="legend-item"><div class="legend-color" style="background: var(--lift);"></div> <span id="legLift">Lift</span></div>
                     <div class="legend-item"><div class="legend-color" style="background: var(--danger);"></div> <span id="legDrag">Drag</span></div>
@@ -259,7 +257,6 @@
             </div>
             
             <div class="canvas-wrapper" id="canvasWrapper">
-                <!-- Temizlenmiş Tek Canvas Yapısı -->
                 <canvas id="airfoilCanvas"></canvas>
             </div>
             
@@ -291,9 +288,11 @@
         let airfoilCoords = { upper: [], lower: [], camber: [] };
         let currentStats = { cl: 0, cd: 0, lift: 0, drag: 0, ld: 0, stall: false, aoaL0: 0, stallAngle: 15 };
         
-        // STABİL VE PERFORMANSLI STREAMLINE (AKIŞ ÇİZGİSİ) MOTORU
+        // CFD GİRDAP VE STREAMLINE MOTORU
         let particles = [];
-        const NUM_PARTICLES = 150; 
+        let vortices = []; 
+        let spawnTimer = 0;
+        const NUM_PARTICLES = 180; 
         let animationFrameId = null;
 
         const dict = {
@@ -302,7 +301,7 @@
                 lblParams: "Kavramsal Tasarım Parametreleri", lblNaca: "NACA Kanat Profili Kodu", ttNaca: "Örn: 2412 (2: Maks Kamburluk, 4: Konum, 12: Kalınlık)",
                 lblAoA: "Hücum Açısı (Angle of Attack)", lblVelocity: "Hava Hızı (V)", lblChord: "Veter Uzunluğu (c)", lblDensity: "Hava Yoğunluğu (ρ)", lblSpan: "Kanat Açıklığı (b)",
                 lblResults: "Aerodinamik Katsayılar ve Kuvvetler", lblLiftForce: "Kaldırma Kuvveti (Lift)", lblDragForce: "Sürüklenme (Drag)", lblCL: "Kaldırma Katsayısı (C_L)", lblCD: "Sürüklenme Kat. (C_D)",
-                lblEfficiency: "Aerodinamik Verim (L/D Oranı)", lblGraphTitle: "C_L vs Alpha (α) Eğrisi", lblCanvasTitle: "Gelişmiş CFD Rüzgar Tüneli", legLift: "Lift (Kaldırma)", legDrag: "Drag (Direnç)", legChord: "Kamburluk Eğrisi",
+                lblEfficiency: "Aerodinamik Verim (L/D Oranı)", lblGraphTitle: "C_L vs Alpha (α) Eğrisi", lblCanvasTitle: "Akışkanlar Mekaniği (CFD) Girdap Motoru", legLift: "Lift (Kaldırma)", legDrag: "Drag (Direnç)", legChord: "Kamburluk Eğrisi",
                 btnAIAnalyze: "Akış Dinamiklerini Yorumla",
                 aiWelcome: "Merhaba! Seçtiğiniz NACA profiline ve uçuş koşullarına göre oluşan akış ayrılmasını (stall) ve girdapları analiz edebilirim.",
                 aiWait: "Akışkanlar mekaniği denklemleri çözülüyor..."
@@ -312,7 +311,7 @@
                 lblParams: "Conceptual Design Parameters", lblNaca: "NACA Airfoil Code", ttNaca: "Ex: 2412 (2: Max Camber, 4: Position, 12: Thickness)",
                 lblAoA: "Angle of Attack (AoA)", lblVelocity: "Air Velocity (V)", lblChord: "Chord Length (c)", lblDensity: "Air Density (ρ)", lblSpan: "Wing Span (b)",
                 lblResults: "Aerodynamic Coefficients & Forces", lblLiftForce: "Lift Force", lblDragForce: "Drag Force", lblCL: "Lift Coefficient (C_L)", lblCD: "Drag Coefficient (C_D)",
-                lblEfficiency: "Aerodynamic Efficiency (L/D Ratio)", lblGraphTitle: "C_L vs Alpha (α) Curve", lblCanvasTitle: "Advanced CFD Wind Tunnel", legLift: "Lift Vector", legDrag: "Drag Vector", legChord: "Camber Line",
+                lblEfficiency: "Aerodynamic Efficiency (L/D Ratio)", lblGraphTitle: "C_L vs Alpha (α) Curve", lblCanvasTitle: "Fluid Mechanics CFD Vortex Engine", legLift: "Lift Vector", legDrag: "Drag Vector", legChord: "Camber Line",
                 btnAIAnalyze: "Analyze Flow Dynamics",
                 aiWelcome: "Hello! I can analyze the flow separation (stall) and wake vortices based on your selected NACA profile and flight conditions.",
                 aiWait: "Solving fluid dynamics equations..."
@@ -455,8 +454,8 @@
             
             airfoilCoords = generateNACA(code);
             
-            // DİNAMİK STALL AÇISI
-            let dynStallAngle = 10 + (airfoilCoords.t * 40) - (airfoilCoords.m * 20);
+            // DİNAMİK STALL AÇISI (Kalın profiller daha geç stall olur)
+            let dynStallAngle = 8 + (airfoilCoords.t * 50) - (airfoilCoords.m * 30);
             if(dynStallAngle < 8) dynStallAngle = 8;
             
             let alphaL0_deg = airfoilCoords.m === 0 ? 0 : -50.6 * airfoilCoords.m;
@@ -519,25 +518,25 @@
             drawGraph(aoa);
         };
 
-        // STABİL STREAMLINE (AKIŞ ÇİZGİSİ) OLUŞTURMA
+        // GİRDAP VE STREAMLINE MOTORU KURULUMU
         function initParticles() {
             particles = [];
+            vortices = []; // Stall düzelirse girdaplar kaybolsun
             if(!canvas) return;
             let h = canvas.height;
             for(let i=0; i<NUM_PARTICLES; i++) {
                 particles.push({
                     x: Math.random() * canvas.width,
-                    baseY: Math.random() * h,
-                    speed: 3 + Math.random() * 4
+                    y: Math.random() * h,
+                    speed: 3 + Math.random() * 2,
+                    history: []
                 });
             }
         }
 
-        // TEMİZ VE KASMAYAN RENDER DÖNGÜSÜ
+        // GERÇEK ZAMANLI CFD RENDER DÖNGÜSÜ
         function animateCFD() {
             if(!ctx || !canvas) return;
-            
-            // Temiz Frame
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
             const cx = canvas.width / 2;
@@ -551,7 +550,10 @@
             let d_input = parseFloat(document.getElementById('density').value) || 1;
             let speedMult = Math.max(0.5, Math.min(v_input * 0.05, 3)); 
             
-            let strokeColor = getComputedStyle(document.body).getPropertyValue('--wind-color').trim() || 'rgba(56, 189, 248, 0.4)';
+            // Yoğunluğa Göre Çizgi Kalınlığı ve Rengi
+            let lineOp = Math.min(0.8, Math.max(0.2, d_input * 0.3));
+            let rgb = isDarkTheme ? '56,189,248' : '2,132,199';
+            let strokeColor = `rgba(${rgb}, ${lineOp})`;
 
             // GRID
             ctx.beginPath();
@@ -561,56 +563,117 @@
             for(let i=0; i<canvas.height; i+=50) { ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); }
             ctx.stroke();
 
-            // AKIŞ ÇİZGİLERİ (Streamlines)
+            // VORTEX (GİRDAP) ÜRETİCİSİ - SADECE STALL ANINDA
+            if (currentStats.stall) {
+                spawnTimer++;
+                if (spawnTimer > 12 / speedMult) { // Hız arttıkça daha sık girdap kopar
+                    spawnTimer = 0;
+                    let sign = (vortices.length % 2 === 0) ? 1 : -1;
+                    
+                    // Girdaplar firar kenarından kopar
+                    let te_lx = chordPx * 0.5;
+                    let te_ly = (chordPx * 0.2) * sign;
+
+                    // Lokalden Globale (Canvas'a) Çevir
+                    let spawnX = cx + te_lx * Math.cos(aoa_rad) - te_ly * Math.sin(aoa_rad);
+                    let spawnY = cy - te_lx * Math.sin(aoa_rad) - te_ly * Math.cos(aoa_rad);
+
+                    let intensity = Math.min(Math.abs(aoa_deg), 30) * 40;
+
+                    vortices.push({ x: spawnX, y: spawnY, strength: sign * intensity * speedMult, age: 0 });
+                }
+            } else {
+                vortices = []; // Stall bittiyse girdapları temizle
+            }
+
+            // GİRDAPLARI GÜNCELLE VE İLERLET
+            for(let i = vortices.length - 1; i >= 0; i--) {
+                let v = vortices[i];
+                // Havanın hızıyla sağa doğru sürüklenirler
+                v.x += 4 * Math.cos(aoa_rad) * speedMult;
+                v.y -= 4 * Math.sin(aoa_rad) * speedMult;
+                v.age++;
+                v.strength *= 0.98; // Zamanla enerjisini kaybeder
+                if(v.age > 150) vortices.splice(i, 1);
+            }
+
+            // AKIŞKAN PARÇACIKLARI (STREAMLINES)
             ctx.lineWidth = 1.5;
             ctx.strokeStyle = strokeColor;
             ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            ctx.beginPath(); // Performans için toplu çizim
             
             for(let p of particles) {
-                p.x += p.speed * speedMult;
-                if(p.x > canvas.width) {
-                    p.x = 0;
-                    p.baseY = Math.random() * canvas.height;
-                }
+                let vx = p.speed * speedMult * Math.cos(aoa_rad);
+                let vy = -p.speed * speedMult * Math.sin(aoa_rad);
 
-                let targetY = p.baseY;
                 let dx = p.x - cx;
-                let dy = p.baseY - cy;
-
-                // Kanadın Etki Alanı (Coanda & Downwash)
-                if (Math.abs(dx) < chordPx * 1.5) {
-                    let influenceX = Math.exp(-(dx * dx) / (chordPx * chordPx * 0.3));
-                    let influenceY = Math.exp(-(dy * dy) / (chordPx * chordPx));
-                    
-                    // Kalınlık Sapması (Hava kanadın üstünden/altından dolaşır)
-                    let dir = dy < 0 ? -1 : 1;
-                    targetY += dir * influenceX * influenceY * chordPx * 0.25;
-                    
-                    // Hücum Açısı Etkisi (Hava aşağı bastırılır - Downwash)
-                    targetY -= influenceX * Math.sin(aoa_rad) * chordPx * 0.4;
-                }
+                let dy = p.y - cy;
                 
-                // Firar Kenarı (Trailing Edge) ve STALL
-                if (dx > 0) {
-                    // Kalıcı Downwash izi
-                    let wakeInfluence = 1 - Math.exp(-dx / chordPx);
-                    targetY -= wakeInfluence * Math.sin(aoa_rad) * chordPx * 0.3;
-                    
-                    // Stall Girdapları (Vortices)
-                    if (currentStats.stall) {
-                        let wakeSpread = Math.abs(dy) / chordPx;
-                        if (wakeSpread < 0.8) {
-                            targetY += (Math.random() - 0.5) * dx * 0.15;
+                // Parçacığın kanada göre yerel konumu
+                let lx = dx * Math.cos(-aoa_rad) - dy * Math.sin(-aoa_rad);
+                let ly = dx * Math.sin(-aoa_rad) + dy * Math.cos(-aoa_rad);
+
+                // KANAT ETKİ ALANI (COANDA EFFECT)
+                if (lx > -chordPx*0.6 && lx < chordPx*0.5) {
+                    let distToChord = Math.abs(ly);
+                    let influence = Math.max(0, 1 - distToChord/(chordPx*0.5));
+
+                    if (!currentStats.stall) {
+                        // Yapışık Akış: Hava profile tutunur
+                        if(lx < 0) { 
+                            vy += Math.sign(ly) * influence * 4 * speedMult; // Burunda ikiye ayrılma
+                        } else { 
+                            vy -= Math.sign(ly) * influence * 2 * speedMult; // Firarda birleşme
+                            vx += influence * 2 * speedMult; // Üst/alt yüzeyde hızlanma (Bernoulli)
+                        }
+                    } else {
+                        // STALL: Üst yüzeyden akış kopması (Separation)
+                        if(lx < 0 && ((aoa_deg > 0 && ly > 0) || (aoa_deg < 0 && ly < 0))) {
+                             vy += Math.sign(ly) * influence * 8 * speedMult; // Hava kanada tutunamaz, fırlar
                         }
                     }
                 }
 
-                // Çizgi Kuyruğu
-                ctx.beginPath();
-                ctx.moveTo(p.x - p.speed * speedMult * 3, targetY);
-                ctx.lineTo(p.x, targetY);
-                ctx.stroke();
+                // GİRDAP ETKİSİ (VON KARMAN VORTEX STREET)
+                for(let v of vortices) {
+                    let vdx = p.x - v.x;
+                    let vdy = p.y - v.y;
+                    let r2 = vdx*vdx + vdy*vdy;
+                    if(r2 > 400) { // Merkeze çok yakınsa fırlamayı önle
+                        let r = Math.sqrt(r2);
+                        let core = chordPx * 0.4;
+                        let v_theta = (v.strength / r) * (1 - Math.exp(-r2/(core*core)));
+                        vx += (-vdy / r) * v_theta;
+                        vy += (vdx / r) * v_theta;
+                    }
+                }
+
+                p.x += vx;
+                p.y += vy;
+
+                // Geçmişi kaydet ki çizgi (streamline) oluşsun
+                p.history.push({x: p.x, y: p.y});
+                if(p.history.length > 25) p.history.shift();
+
+                // Ekrandan çıkarsa başa döndür
+                if(p.x > canvas.width + 100 || p.y < -100 || p.y > canvas.height + 100) {
+                    p.x = -50;
+                    p.y = Math.random() * canvas.height;
+                    p.history = [];
+                }
+
+                // Parçacığı Çiz
+                if(p.history.length > 1) {
+                    ctx.moveTo(p.history[0].x, p.history[0].y);
+                    for(let j=1; j<p.history.length; j++) {
+                        ctx.lineTo(p.history[j].x, p.history[j].y);
+                    }
+                }
             }
+            ctx.stroke();
 
             // KANAT PROFİLİ ÇİZİMİ (Üst Katman)
             ctx.save();
@@ -755,13 +818,13 @@
                 
                 if(currentLang === 'tr') {
                     report = `<strong>Aerodinamik Rapor (NACA ${naca}):</strong><br><br>`;
-                    report += `Hesaplanan Stall Açısı: <strong>${currentStats.stallAngle.toFixed(1)}°</strong>.<br>`;
+                    report += `Hesaplanan Kritik Stall Açısı: <strong>${currentStats.stallAngle.toFixed(1)}°</strong>.<br>`;
                     report += `Şu anki hücum açınız <strong>${aoa}°</strong>. Aerodinamik verim (L/D oranı): <strong>${currentStats.ld.toFixed(1)}</strong>.<br><br>`;
                     
                     if(currentStats.stall) {
-                        report += `<span style="color:var(--danger)">⚠️ STALL UYARISI: Kanat profiliniz kritik açıyı geçti. Hava akışı kanat üzerinden ayrılıyor (Flow Separation) ve arkada şiddetli girdaplar oluşuyor. Kaldırma kuvveti çakıldı.</span>`;
+                        report += `<span style="color:var(--danger)">⚠️ STALL UYARISI: Kanat profiliniz kritik açıyı geçti. Hava akışı kanat üzerinden ayrılıyor (Flow Separation) ve arkada Von Kármán girdapları oluşuyor. Kaldırma kuvveti çakıldı.</span>`;
                     } else if (currentStats.ld > 40) {
-                        report += `<span style="color:var(--success)">✅ Seyir Uçuşu İçin İdeal: Mükemmel bir Kaldırma/Sürüklenme oranı yakaladınız. Hava akışı profile mükemmel yapışıyor (Coanda).</span>`;
+                        report += `<span style="color:var(--success)">✅ Seyir Uçuşu İçin İdeal: Mükemmel bir Kaldırma/Sürüklenme oranı yakaladınız. Hava akışı profile Coanda etkisiyle kusursuz yapışıyor.</span>`;
                     } else if (currentStats.cl < 0) {
                         report += `Açı sıfır kaldırma açısının (${currentStats.aoaL0.toFixed(1)}°) altında. Ters (negatif) kaldırma üretiyorsunuz. Akış kanadın altından ayrılma eğiliminde.`;
                     } else {
@@ -769,13 +832,13 @@
                     }
                 } else {
                     report = `<strong>Aerodynamic Report (NACA ${naca}):</strong><br><br>`;
-                    report += `Calculated Stall Angle: <strong>${currentStats.stallAngle.toFixed(1)}°</strong>.<br>`;
+                    report += `Calculated Critical Stall Angle: <strong>${currentStats.stallAngle.toFixed(1)}°</strong>.<br>`;
                     report += `Current Angle of Attack: <strong>${aoa}°</strong>. Aerodynamic efficiency (L/D ratio): <strong>${currentStats.ld.toFixed(1)}</strong>.<br><br>`;
                     
                     if(currentStats.stall) {
-                        report += `<span style="color:var(--danger)">⚠️ STALL WARNING: The airfoil has exceeded the critical angle. Flow separation is occurring, causing a rapid loss of lift and immense wake turbulence.</span>`;
+                        report += `<span style="color:var(--danger)">⚠️ STALL WARNING: The airfoil has exceeded the critical angle. Flow separation is occurring, causing a rapid loss of lift and immense wake turbulence (Von Kármán vortices).</span>`;
                     } else if (currentStats.ld > 40) {
-                        report += `<span style="color:var(--success)">✅ Optimal Cruise: Excellent Lift/Drag ratio achieved. Flow is perfectly attached to the profile.</span>`;
+                        report += `<span style="color:var(--success)">✅ Optimal Cruise: Excellent Lift/Drag ratio achieved. Flow is perfectly attached to the profile via Coanda effect.</span>`;
                     } else if (currentStats.cl < 0) {
                         report += `The angle is below the zero-lift angle (${currentStats.aoaL0.toFixed(1)}°). You are generating negative lift.`;
                     } else {
