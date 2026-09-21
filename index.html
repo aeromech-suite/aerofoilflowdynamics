@@ -23,7 +23,7 @@
             --border: #334155;
             --input-bg: rgba(15, 23, 42, 0.6);
             --grid-color: rgba(255, 255, 255, 0.05);
-            --wind-base: 56, 189, 248; /* RGB for primary */
+            --wind-color: rgba(56, 189, 248, 0.4);
         }
 
         body.light-theme {
@@ -42,7 +42,7 @@
             --border: #e2e8f0;
             --input-bg: #f1f5f9;
             --grid-color: rgba(0, 0, 0, 0.05);
-            --wind-base: 2, 132, 199;
+            --wind-color: rgba(2, 132, 199, 0.3);
         }
 
         body { 
@@ -87,7 +87,7 @@
         }
         .input-grid-2 input:focus { outline: none; border-color: var(--primary); }
         
-        /* SLIDER (HÜCUM AÇISI) */
+        /* SLIDER */
         .slider-container { margin-bottom: 15px; background: var(--input-bg); padding: 15px; border-radius: 8px; border: 1px solid var(--border); }
         .slider-header { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 10px; }
         .val-badge { color: var(--primary); font-family: 'Fira Code', monospace; font-size: 14px;}
@@ -107,7 +107,7 @@
 
         .mini-graph { width: 100%; height: 130px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
 
-        /* SAĞ PANEL (CANVAS & SİMÜLASYON) */
+        /* SAĞ PANEL */
         .main-view { flex: 1; display: flex; flex-direction: column; background: var(--bg); position: relative; }
         .canvas-toolbar { padding: 15px 20px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; z-index: 5;}
         .legend { display: flex; gap: 15px; font-size: 12px; color: var(--muted); font-weight: 500; align-items: center;}
@@ -115,10 +115,10 @@
         .legend-color { width: 14px; height: 4px; border-radius: 2px; }
 
         .canvas-wrapper { flex: 1; position: relative; overflow: hidden; background-color: var(--bg); }
+        /* Tümü tek bir canvas'a birleştirildi (Performans ve netlik için) */
         canvas#airfoilCanvas { display: block; width: 100%; height: 100%; position: absolute; top:0; left:0; z-index: 2;}
-        canvas#particleCanvas { display: block; width: 100%; height: 100%; position: absolute; top:0; left:0; z-index: 1;}
 
-        /* AI CHATBOT (AeroMech AI Co-Pilot) */
+        /* AI CHATBOT */
         .ai-fab {
             position: absolute; bottom: 25px; right: 25px; width: 60px; height: 60px; border-radius: 50%;
             background: linear-gradient(135deg, var(--primary), var(--primary-hover)); color: #000;
@@ -259,7 +259,7 @@
             </div>
             
             <div class="canvas-wrapper" id="canvasWrapper">
-                <canvas id="particleCanvas"></canvas>
+                <!-- Temizlenmiş Tek Canvas Yapısı -->
                 <canvas id="airfoilCanvas"></canvas>
             </div>
             
@@ -282,19 +282,18 @@
 
     <!-- KÜRESEL JAVASCRIPT MOTORU -->
     <script>
-        // GLOBALS
         let currentLang = 'tr';
         let currentUnit = 'metric';
         let isDarkTheme = true;
         let aiChatOpen = false;
         
-        let canvas, ctx, wrapper, graphCanvas, gCtx, pCanvas, pCtx;
+        let canvas, ctx, wrapper, graphCanvas, gCtx;
         let airfoilCoords = { upper: [], lower: [], camber: [] };
         let currentStats = { cl: 0, cd: 0, lift: 0, drag: 0, ld: 0, stall: false, aoaL0: 0, stallAngle: 15 };
         
-        // AKIŞKAN PARTİKÜL MOTORU
+        // STABİL VE PERFORMANSLI STREAMLINE (AKIŞ ÇİZGİSİ) MOTORU
         let particles = [];
-        const NUM_PARTICLES = 400; 
+        const NUM_PARTICLES = 150; 
         let animationFrameId = null;
 
         const dict = {
@@ -323,8 +322,6 @@
         window.onload = function() {
             canvas = document.getElementById('airfoilCanvas');
             ctx = canvas.getContext('2d');
-            pCanvas = document.getElementById('particleCanvas');
-            pCtx = pCanvas.getContext('2d');
             wrapper = document.getElementById('canvasWrapper');
             graphCanvas = document.getElementById('graphCanvas');
             gCtx = graphCanvas.getContext('2d');
@@ -395,14 +392,17 @@
         }
 
         function resizeCanvases() {
-            if(wrapper) { 
-                canvas.width = wrapper.clientWidth; canvas.height = wrapper.clientHeight; 
-                pCanvas.width = wrapper.clientWidth; pCanvas.height = wrapper.clientHeight; 
+            if(wrapper && canvas) { 
+                canvas.width = wrapper.clientWidth; 
+                canvas.height = wrapper.clientHeight; 
             }
-            if(graphCanvas) { graphCanvas.width = graphCanvas.clientWidth; graphCanvas.height = graphCanvas.clientHeight; }
+            if(graphCanvas) { 
+                graphCanvas.width = graphCanvas.clientWidth; 
+                graphCanvas.height = graphCanvas.clientHeight; 
+            }
         }
 
-        // NACA 4-DIGIT GENERATOR
+        // NACA FORMÜLASYONU
         function generateNACA(code) {
             if(code.length !== 4 || isNaN(code)) code = "2412";
             
@@ -416,7 +416,6 @@
             for(let i=0; i<=numPoints; i++) {
                 let beta = i * Math.PI / numPoints;
                 let x = (1.0 - Math.cos(beta)) / 2.0;
-                
                 let yt = 5 * t * (0.2969 * Math.sqrt(x) - 0.1260 * x - 0.3516 * Math.pow(x,2) + 0.2843 * Math.pow(x,3) - 0.1015 * Math.pow(x,4));
                 
                 let yc = 0, dyc = 0;
@@ -443,20 +442,7 @@
             return { upper, lower, camber, m, p, t };
         }
 
-        // KANAT ÜZERİNDE HASSAS KOORDİNAT BULUCU (Akışkanların yüzeye yapışması için)
-        function getAirfoilY(nx) {
-            if(nx <= 0) return { uy: 0, ly: 0 };
-            if(nx >= 1) return { uy: 0, ly: 0 };
-            
-            let bestIdx = 0; let minDist = 999;
-            for(let i=0; i<airfoilCoords.upper.length; i++) {
-                let dist = Math.abs(airfoilCoords.upper[i].x - nx);
-                if(dist < minDist) { minDist = dist; bestIdx = i; }
-            }
-            return { uy: airfoilCoords.upper[bestIdx].y, ly: airfoilCoords.lower[bestIdx].y };
-        }
-
-        // FİZİK & MATEMATİK GÜNCELLEMESİ (Gerçek Zamanlı)
+        // FİZİK & MATEMATİK GÜNCELLEMESİ
         window.updateSimulation = function() {
             let code = document.getElementById('nacaCode').value;
             let aoa = parseFloat(document.getElementById('aoaSlider').value);
@@ -469,8 +455,7 @@
             
             airfoilCoords = generateNACA(code);
             
-            // DİNAMİK STALL AÇISI: Kalın ve az kambur profiller daha geç stall olur.
-            // Ampirik kural: ~ 10° + (Kalınlık * 40) - (Kamburluk * 20)
+            // DİNAMİK STALL AÇISI
             let dynStallAngle = 10 + (airfoilCoords.t * 40) - (airfoilCoords.m * 20);
             if(dynStallAngle < 8) dynStallAngle = 8;
             
@@ -531,175 +516,115 @@
                 document.getElementById('cardDrag').style.borderColor = 'var(--border)';
             }
             
-            drawAirfoilVectors();
             drawGraph(aoa);
         };
 
-        // AKIŞKAN PARÇACIKLARININ (CFD) OLUŞTURULMASI
+        // STABİL STREAMLINE (AKIŞ ÇİZGİSİ) OLUŞTURMA
         function initParticles() {
             particles = [];
-            if(!pCanvas) return;
-            const rgb = getComputedStyle(document.body).getPropertyValue('--wind-base').trim() || '56, 189, 248';
+            if(!canvas) return;
+            let h = canvas.height;
             for(let i=0; i<NUM_PARTICLES; i++) {
                 particles.push({
-                    x: Math.random() * pCanvas.width,
-                    y: Math.random() * pCanvas.height,
-                    vx: 0, vy: 0,
-                    bl_offset: Math.random() * 40 - 20, // Sınır tabaka mesafesi rastgeleliği
-                    rgb: rgb
+                    x: Math.random() * canvas.width,
+                    baseY: Math.random() * h,
+                    speed: 3 + Math.random() * 4
                 });
             }
         }
 
-        // AKIŞKAN FİZİK MOTORU (Sınır Tabaka ve Stall Girdapları)
+        // TEMİZ VE KASMAYAN RENDER DÖNGÜSÜ
         function animateCFD() {
-            if(!pCtx || !pCanvas) return;
-            
-            // Motion Blur efekti (Kuyruk bırakma)
-            pCtx.fillStyle = isDarkTheme ? 'rgba(11, 17, 32, 0.2)' : 'rgba(248, 250, 252, 0.2)';
-            pCtx.fillRect(0, 0, pCanvas.width, pCanvas.height);
-            
-            const cx = pCanvas.width / 2;
-            const cy = pCanvas.height / 2;
-            const scale = Math.min(pCanvas.width, pCanvas.height) * 0.6; 
-            
-            let aoa_deg = parseFloat(document.getElementById('aoaSlider').value) || 0;
-            const aoa_rad = -aoa_deg * Math.PI / 180;
-            const chordPx = 1.0 * scale; 
-            
-            // Hız ve Yoğunluk görsel etkisi
-            let v_input = parseFloat(document.getElementById('velocity').value) || 1;
-            let d_input = parseFloat(document.getElementById('density').value) || 1;
-            let baseSpeed = Math.max(3, v_input * 0.1); 
-            let opacity = Math.min(0.9, Math.max(0.1, d_input * 0.4)); // Yoğunluk arttıkça çizgiler belirginleşir
-
-            // Separation (Ayrılma) Noktası Hesaplaması
-            let sepPoint = 1.0;
-            if(aoa_deg > currentStats.stallAngle) {
-                sepPoint = Math.max(0.05, 1.0 - (aoa_deg - currentStats.stallAngle) * 0.15);
-            } else if (aoa_deg < -currentStats.stallAngle) {
-                sepPoint = Math.max(0.05, 1.0 - Math.abs(aoa_deg + currentStats.stallAngle) * 0.15);
-            }
-
-            pCtx.lineWidth = 1.5;
-            
-            for(let i=0; i<particles.length; i++) {
-                let p = particles[i];
-                let local_vx = baseSpeed;
-                let local_vy = 0;
-                
-                let dx = p.x - cx;
-                let dy = p.y - cy;
-                
-                // Parçacığı kanat düzlemine (Local coordinates) çevir
-                let lx = dx * Math.cos(-aoa_rad) - dy * Math.sin(-aoa_rad);
-                let ly = dx * Math.sin(-aoa_rad) + dy * Math.cos(-aoa_rad);
-                
-                let nx = lx / chordPx + 0.25; 
-                
-                // Kanat Çevresi Fizik Motoru
-                if (nx > -0.2 && nx < 1.1) {
-                    let {uy, ly: lowY} = getAirfoilY(nx < 0 ? 0.01 : (nx > 1 ? 0.99 : nx));
-                    let uy_px = -uy * scale; // Canvas Y ters
-                    let ly_px = -lowY * scale;
-                    
-                    let bl_zone = 50; 
-                    
-                    if (ly > uy_px - bl_zone && ly < ly_px + bl_zone) {
-                        // Çarpışma Önleme (Solid Body)
-                        if (ly > uy_px && ly < ly_px) {
-                            if (Math.abs(ly - uy_px) < Math.abs(ly - ly_px)) ly = uy_px - 2;
-                            else ly = ly_px + 2;
-                        }
-                        
-                        // SINIR TABAKA (Boundary Layer) UYUMU
-                        if (ly <= uy_px) {
-                            // Üst Yüzey
-                            if (nx <= sepPoint || aoa_deg < -currentStats.stallAngle) {
-                                // Yapışık Akış (Coanda)
-                                local_vy = (uy_px - Math.abs(p.bl_offset) - ly) * 0.2;
-                                local_vx *= 1.2; // Üstten hava hızlanır (Bernoulli)
-                            } else {
-                                // Ayrılmış Akış (Stall Vortices)
-                                local_vx *= 0.3; 
-                                local_vy += (Math.random() - 0.5) * 4; 
-                                local_vx -= Math.sin(ly * 0.1) * 3;
-                                local_vy += Math.cos(lx * 0.1) * 3;
-                            }
-                        } else {
-                            // Alt Yüzey
-                            if (aoa_deg < -currentStats.stallAngle && nx > sepPoint) {
-                                // Ters stall girdabı
-                                local_vx *= 0.3; 
-                                local_vy += (Math.random() - 0.5) * 4; 
-                            } else {
-                                local_vy = (ly_px + Math.abs(p.bl_offset) - ly) * 0.2;
-                            }
-                        }
-                    }
-                } else if (nx >= 1.1) {
-                    // İZ BÖLGESİ (Wake)
-                    if (currentStats.stall) {
-                        if (Math.abs(ly) < scale * 0.5) {
-                            local_vx *= 0.6;
-                            local_vy += (Math.random() - 0.5) * 2;
-                            local_vx += Math.sin(ly * 0.05) * 2;
-                            local_vy += Math.cos(lx * 0.05) * 2;
-                        }
-                    } else {
-                        // Downwash (Aşağı doğru akış)
-                        local_vy += Math.sin(aoa_rad) * baseSpeed * 0.8; 
-                    }
-                }
-
-                // Lokal Hızları Globale Çevir
-                p.vx = local_vx * Math.cos(aoa_rad) - local_vy * Math.sin(aoa_rad);
-                p.vy = local_vx * Math.sin(aoa_rad) + local_vy * Math.cos(aoa_rad);
-                
-                p.x += p.vx;
-                p.y += p.vy;
-
-                // Ekrandan çıkarsa başa sar
-                if(p.x > pCanvas.width || p.y < -100 || p.y > pCanvas.height + 100 || p.vx < -5) {
-                    p.x = 0;
-                    p.y = Math.random() * pCanvas.height;
-                }
-
-                // Çiz
-                pCtx.beginPath();
-                pCtx.moveTo(p.x - p.vx*1.5, p.y - p.vy*1.5);
-                pCtx.lineTo(p.x, p.y);
-                pCtx.strokeStyle = `rgba(${p.rgb}, ${opacity})`;
-                pCtx.stroke();
-            }
-
-            animationFrameId = requestAnimationFrame(animateCFD);
-        }
-
-        // KANAT VE VEKTÖR ÇİZİMİ
-        function drawAirfoilVectors() {
             if(!ctx || !canvas) return;
+            
+            // Temiz Frame
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
             const cx = canvas.width / 2;
             const cy = canvas.height / 2;
-            const scale = Math.min(canvas.width, canvas.height) * 0.6; 
+            const chordPx = Math.min(canvas.width, canvas.height) * 0.6; 
+            
             let aoa_deg = parseFloat(document.getElementById('aoaSlider').value) || 0;
             const aoa_rad = -aoa_deg * Math.PI / 180;
             
+            let v_input = parseFloat(document.getElementById('velocity').value) || 1;
+            let d_input = parseFloat(document.getElementById('density').value) || 1;
+            let speedMult = Math.max(0.5, Math.min(v_input * 0.05, 3)); 
+            
+            let strokeColor = getComputedStyle(document.body).getPropertyValue('--wind-color').trim() || 'rgba(56, 189, 248, 0.4)';
+
+            // GRID
+            ctx.beginPath();
+            ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--grid-color').trim() || 'rgba(255,255,255,0.05)';
+            ctx.lineWidth = 1;
+            for(let i=0; i<canvas.width; i+=50) { ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); }
+            for(let i=0; i<canvas.height; i+=50) { ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); }
+            ctx.stroke();
+
+            // AKIŞ ÇİZGİLERİ (Streamlines)
+            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = strokeColor;
+            ctx.lineCap = 'round';
+            
+            for(let p of particles) {
+                p.x += p.speed * speedMult;
+                if(p.x > canvas.width) {
+                    p.x = 0;
+                    p.baseY = Math.random() * canvas.height;
+                }
+
+                let targetY = p.baseY;
+                let dx = p.x - cx;
+                let dy = p.baseY - cy;
+
+                // Kanadın Etki Alanı (Coanda & Downwash)
+                if (Math.abs(dx) < chordPx * 1.5) {
+                    let influenceX = Math.exp(-(dx * dx) / (chordPx * chordPx * 0.3));
+                    let influenceY = Math.exp(-(dy * dy) / (chordPx * chordPx));
+                    
+                    // Kalınlık Sapması (Hava kanadın üstünden/altından dolaşır)
+                    let dir = dy < 0 ? -1 : 1;
+                    targetY += dir * influenceX * influenceY * chordPx * 0.25;
+                    
+                    // Hücum Açısı Etkisi (Hava aşağı bastırılır - Downwash)
+                    targetY -= influenceX * Math.sin(aoa_rad) * chordPx * 0.4;
+                }
+                
+                // Firar Kenarı (Trailing Edge) ve STALL
+                if (dx > 0) {
+                    // Kalıcı Downwash izi
+                    let wakeInfluence = 1 - Math.exp(-dx / chordPx);
+                    targetY -= wakeInfluence * Math.sin(aoa_rad) * chordPx * 0.3;
+                    
+                    // Stall Girdapları (Vortices)
+                    if (currentStats.stall) {
+                        let wakeSpread = Math.abs(dy) / chordPx;
+                        if (wakeSpread < 0.8) {
+                            targetY += (Math.random() - 0.5) * dx * 0.15;
+                        }
+                    }
+                }
+
+                // Çizgi Kuyruğu
+                ctx.beginPath();
+                ctx.moveTo(p.x - p.speed * speedMult * 3, targetY);
+                ctx.lineTo(p.x, targetY);
+                ctx.stroke();
+            }
+
+            // KANAT PROFİLİ ÇİZİMİ (Üst Katman)
             ctx.save();
             ctx.translate(cx, cy);
             ctx.scale(1, -1);
             ctx.rotate(aoa_rad);
             
-            // Kanat Dış Zarfı
             ctx.beginPath();
-            ctx.moveTo((airfoilCoords.upper[0].x - 0.25) * scale, airfoilCoords.upper[0].y * scale);
+            ctx.moveTo((airfoilCoords.upper[0].x - 0.25) * chordPx, airfoilCoords.upper[0].y * chordPx);
             for(let i=1; i<airfoilCoords.upper.length; i++) {
-                ctx.lineTo((airfoilCoords.upper[i].x - 0.25) * scale, airfoilCoords.upper[i].y * scale);
+                ctx.lineTo((airfoilCoords.upper[i].x - 0.25) * chordPx, airfoilCoords.upper[i].y * chordPx);
             }
             for(let i=airfoilCoords.lower.length-1; i>=0; i--) {
-                ctx.lineTo((airfoilCoords.lower[i].x - 0.25) * scale, airfoilCoords.lower[i].y * scale);
+                ctx.lineTo((airfoilCoords.lower[i].x - 0.25) * chordPx, airfoilCoords.lower[i].y * chordPx);
             }
             ctx.closePath();
             
@@ -709,31 +634,32 @@
             ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--text').trim() || '#fff';
             ctx.stroke();
 
-            // Kamburluk (Camber) Eğrisi
+            // Kamburluk (Camber)
             ctx.beginPath();
-            ctx.moveTo((airfoilCoords.camber[0].x - 0.25) * scale, airfoilCoords.camber[0].y * scale);
+            ctx.moveTo((airfoilCoords.camber[0].x - 0.25) * chordPx, airfoilCoords.camber[0].y * chordPx);
             for(let i=1; i<airfoilCoords.camber.length; i++) {
-                ctx.lineTo((airfoilCoords.camber[i].x - 0.25) * scale, airfoilCoords.camber[i].y * scale);
+                ctx.lineTo((airfoilCoords.camber[i].x - 0.25) * chordPx, airfoilCoords.camber[i].y * chordPx);
             }
             ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--primary').trim() || '#38bdf8';
             ctx.setLineDash([5, 5]);
             ctx.stroke();
             ctx.setLineDash([]);
-            
             ctx.restore();
 
-            // KUVVET VEKTÖRLERİ (Lift & Drag) - Kanattan bağımsız, akışa dik
-            let maxVecLen = scale * 0.8;
+            // LIFT & DRAG VEKTÖRLERİ
+            let maxVecLen = chordPx * 0.8;
             let liftLen = (Math.abs(currentStats.cl) / 2.0) * maxVecLen; 
             let dragLen = (currentStats.cd / 0.3) * maxVecLen * 0.5; 
             
             if(liftLen > 5) {
                 let dirY = currentStats.cl > 0 ? -1 : 1;
-                drawArrow(ctx, cx, cy, cx, cy + dirY * liftLen, getComputedStyle(document.body).getPropertyValue('--lift').trim());
+                drawArrow(ctx, cx, cy, cx, cy + dirY * liftLen, getComputedStyle(document.body).getPropertyValue('--lift').trim() || '#8b5cf6');
             }
             if(dragLen > 5) {
-                drawArrow(ctx, cx, cy, cx + dragLen, cy, getComputedStyle(document.body).getPropertyValue('--danger').trim());
+                drawArrow(ctx, cx, cy, cx + dragLen, cy, getComputedStyle(document.body).getPropertyValue('--danger').trim() || '#ef4444');
             }
+
+            animationFrameId = requestAnimationFrame(animateCFD);
         }
 
         function drawArrow(context, fromx, fromy, tox, toy, color) {
@@ -750,7 +676,7 @@
             context.fillStyle = color; context.fill();
         }
 
-        // DRAW C_L GRAPH
+        // C_L GRAFİĞİ
         function drawGraph(currentAoA) {
             if(!gCtx || !graphCanvas) return;
             const w = graphCanvas.width;
