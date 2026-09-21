@@ -6,7 +6,7 @@
     <title>AeroMech AeroFoil | Flow Dynamics Simulator</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        /* ORTAK TEMA VE RENK PALETİ (SİSTEM STANDARDI) */
+        /* ORTAK TEMA VE RENK PALETİ */
         :root {
             --bg: #0b1120; 
             --panel: #1e293b; 
@@ -16,13 +16,14 @@
             --danger: #ef4444; 
             --success: #10b981;
             --warning: #f59e0b;
-            --lift: #8b5cf6; /* Kaldırma (Lift) Vektör Rengi */
-            --drag: #ef4444; /* Sürüklenme (Drag) Vektör Rengi */
+            --lift: #8b5cf6; 
+            --drag: #ef4444; 
             --text: #f8fafc; 
             --muted: #94a3b8;
             --border: #334155;
             --input-bg: rgba(15, 23, 42, 0.6);
-            --wind-color: rgba(56, 189, 248, 0.4);
+            --grid-color: rgba(255, 255, 255, 0.05);
+            --wind-base: 56, 189, 248; /* RGB for primary */
         }
 
         body.light-theme {
@@ -40,7 +41,8 @@
             --muted: #64748b;
             --border: #e2e8f0;
             --input-bg: #f1f5f9;
-            --wind-color: rgba(2, 132, 199, 0.3);
+            --grid-color: rgba(0, 0, 0, 0.05);
+            --wind-base: 2, 132, 199;
         }
 
         body { 
@@ -70,7 +72,7 @@
         .sidebar {
             width: 440px; background: var(--panel); border-right: 1px solid var(--border);
             display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0;
-            transition: background-color 0.3s; z-index: 10; padding-bottom: 110px; /* AI Chatbot Güvenlik Boşluğu */
+            transition: background-color 0.3s; z-index: 10; padding-bottom: 110px;
         }
         .sidebar-section { padding: 20px; border-bottom: 1px solid var(--border); }
         .section-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
@@ -95,7 +97,7 @@
 
         /* İSTATİSTİKLER VE GRAFİK */
         .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;}
-        .stat-card { background: var(--input-bg); border: 1px solid var(--border); padding: 12px; border-radius: 8px; position:relative; overflow:hidden;}
+        .stat-card { background: var(--input-bg); border: 1px solid var(--border); padding: 12px; border-radius: 8px; position:relative; overflow:hidden; transition: border-color 0.3s;}
         .stat-card span { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; font-weight: 500;}
         .stat-card strong { font-size: 16px; font-family: 'Fira Code', monospace; color: var(--text); transition: color 0.3s;}
         .stat-card.lift { border-color: var(--lift); background: rgba(139, 92, 246, 0.05); }
@@ -107,14 +109,15 @@
 
         /* SAĞ PANEL (CANVAS & SİMÜLASYON) */
         .main-view { flex: 1; display: flex; flex-direction: column; background: var(--bg); position: relative; }
-        .canvas-toolbar { padding: 15px 20px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .canvas-toolbar { padding: 15px 20px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; z-index: 5;}
         .legend { display: flex; gap: 15px; font-size: 12px; color: var(--muted); font-weight: 500; align-items: center;}
         .legend-item { display: flex; align-items: center; gap: 6px; }
         .legend-color { width: 14px; height: 4px; border-radius: 2px; }
 
         .canvas-wrapper { flex: 1; position: relative; overflow: hidden; background-color: var(--bg); }
-        canvas#airfoilCanvas { display: block; width: 100%; height: 100%; cursor: crosshair;}
-        
+        canvas#airfoilCanvas { display: block; width: 100%; height: 100%; position: absolute; top:0; left:0; z-index: 2;}
+        canvas#particleCanvas { display: block; width: 100%; height: 100%; position: absolute; top:0; left:0; z-index: 1;}
+
         /* AI CHATBOT (AeroMech AI Co-Pilot) */
         .ai-fab {
             position: absolute; bottom: 25px; right: 25px; width: 60px; height: 60px; border-radius: 50%;
@@ -139,7 +142,6 @@
         .ai-analyze-btn { background: var(--primary-glow); color: var(--primary); border: 1px solid rgba(56, 189, 248, 0.3); margin: 0 20px 20px 20px; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; font-size: 13px;}
         .ai-analyze-btn:hover { background: var(--primary); color: #000; }
         
-        /* SCROLLBAR */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
@@ -178,7 +180,6 @@
                 <div class="input-grid-2" style="grid-template-columns: 1fr;">
                     <div>
                         <label id="lblNaca">NACA Kanat Profili Kodu <span class="tooltip">i<span class="tooltiptext" id="ttNaca">Örn: 2412 (2: Maks Kamburluk, 4: Kamburluk Konumu, 12: Kalınlık oranı)</span></span></label>
-                        <!-- oninput eklendi: Veriler anlık değişecek -->
                         <input type="text" id="nacaCode" value="2412" maxlength="4" oninput="updateSimulation()">
                     </div>
                 </div>
@@ -188,14 +189,13 @@
                         <span id="lblAoA">Hücum Açısı (Angle of Attack)</span>
                         <span class="val-badge"><span id="aoaVal">5.0</span>°</span>
                     </div>
-                    <!-- oninput eklendi: Kaydırıcı oynatıldıkça simülasyon akacak -->
                     <input type="range" id="aoaSlider" min="-10" max="25" value="5" step="0.1" oninput="updateSimulation()">
                 </div>
 
                 <div class="input-grid-2">
                     <div>
                         <label id="lblVelocity">Hava Hızı (V)</label>
-                        <input type="number" id="velocity" value="100" oninput="updateSimulation()">
+                        <input type="number" id="velocity" value="50" oninput="updateSimulation()">
                     </div>
                     <div>
                         <label id="lblChord">Veter Uzunluğu (c)</label>
@@ -236,7 +236,6 @@
                             <span id="lblEfficiency">Aerodinamik Verim (L/D Oranı)</span>
                             <strong id="statEff" style="color:var(--success);">0.00</strong>
                         </div>
-                        <!-- Dinamik Stall Uyarısı -->
                         <div id="stallWarning" style="color: var(--danger); font-size: 11px; font-weight: 700; padding: 4px 8px; border: 1px solid var(--danger); border-radius: 4px; display: none; background: rgba(239, 68, 68, 0.1);">
                             STALL (TUTUNMA KAYBI)
                         </div>
@@ -251,7 +250,7 @@
         <!-- SAĞ PANEL (CANVAS & GÖRSELLEŞTİRME) -->
         <div class="main-view">
             <div class="canvas-toolbar">
-                <div style="font-weight:600; font-size:14px; color:var(--text);" id="lblCanvasTitle">Rüzgar Tüneli CFD Görselleştirmesi</div>
+                <div style="font-weight:600; font-size:14px; color:var(--text);" id="lblCanvasTitle">Gelişmiş CFD Rüzgar Tüneli</div>
                 <div class="legend">
                     <div class="legend-item"><div class="legend-color" style="background: var(--lift);"></div> <span id="legLift">Lift</span></div>
                     <div class="legend-item"><div class="legend-color" style="background: var(--danger);"></div> <span id="legDrag">Drag</span></div>
@@ -260,6 +259,7 @@
             </div>
             
             <div class="canvas-wrapper" id="canvasWrapper">
+                <canvas id="particleCanvas"></canvas>
                 <canvas id="airfoilCanvas"></canvas>
             </div>
             
@@ -280,6 +280,7 @@
         </div>
     </div>
 
+    <!-- KÜRESEL JAVASCRIPT MOTORU -->
     <script>
         // GLOBALS
         let currentLang = 'tr';
@@ -287,80 +288,69 @@
         let isDarkTheme = true;
         let aiChatOpen = false;
         
-        let canvas, ctx, wrapper, graphCanvas, gCtx;
-        let airfoilCoords = { upper: [], lower: [], camber: [], rawPoints: [] };
+        let canvas, ctx, wrapper, graphCanvas, gCtx, pCanvas, pCtx;
+        let airfoilCoords = { upper: [], lower: [], camber: [] };
         let currentStats = { cl: 0, cd: 0, lift: 0, drag: 0, ld: 0, stall: false, aoaL0: 0, stallAngle: 15 };
         
-        // AKIŞKANLAR MEKANİĞİ PARÇACIK MOTORU (CFD PARTICLE ENGINE)
+        // AKIŞKAN PARTİKÜL MOTORU
         let particles = [];
-        const NUM_PARTICLES = 300; 
+        const NUM_PARTICLES = 400; 
         let animationFrameId = null;
 
-        // DICTIONARY
         const dict = {
             tr: {
-                themeLight: "Aydınlık Tema", themeDark: "Karanlık Tema",
-                unitSI: "Birim: SI (m, m/s)", unitImp: "Birim: Imperial (ft, mph)",
-                lblParams: "Kavramsal Tasarım Parametreleri", lblNaca: "NACA Kanat Profili Kodu",
-                ttNaca: "Örn: 2412 (2: Maks Kamburluk, 4: Konum, 12: Kalınlık)",
-                lblAoA: "Hücum Açısı (Angle of Attack)", lblVelocity: "Hava Hızı (V)",
-                lblChord: "Veter Uzunluğu (c)", lblDensity: "Hava Yoğunluğu (ρ)", lblSpan: "Kanat Açıklığı (b)",
-                lblResults: "Aerodinamik Katsayılar ve Kuvvetler", lblLiftForce: "Kaldırma Kuvveti (Lift)",
-                lblDragForce: "Sürüklenme (Drag)", lblCL: "Kaldırma Katsayısı (C_L)", lblCD: "Sürüklenme Kat. (C_D)",
-                lblEfficiency: "Aerodinamik Verim (L/D Oranı)", lblGraphTitle: "C_L vs Alpha (α) Eğrisi",
-                lblCanvasTitle: "Rüzgar Tüneli CFD Görselleştirmesi", legLift: "Lift (Kaldırma)", legDrag: "Drag (Direnç)", legChord: "Kamburluk Eğrisi",
+                themeLight: "Aydınlık Tema", themeDark: "Karanlık Tema", unitSI: "Birim: SI (m, m/s)", unitImp: "Birim: Imperial (ft, mph)",
+                lblParams: "Kavramsal Tasarım Parametreleri", lblNaca: "NACA Kanat Profili Kodu", ttNaca: "Örn: 2412 (2: Maks Kamburluk, 4: Konum, 12: Kalınlık)",
+                lblAoA: "Hücum Açısı (Angle of Attack)", lblVelocity: "Hava Hızı (V)", lblChord: "Veter Uzunluğu (c)", lblDensity: "Hava Yoğunluğu (ρ)", lblSpan: "Kanat Açıklığı (b)",
+                lblResults: "Aerodinamik Katsayılar ve Kuvvetler", lblLiftForce: "Kaldırma Kuvveti (Lift)", lblDragForce: "Sürüklenme (Drag)", lblCL: "Kaldırma Katsayısı (C_L)", lblCD: "Sürüklenme Kat. (C_D)",
+                lblEfficiency: "Aerodinamik Verim (L/D Oranı)", lblGraphTitle: "C_L vs Alpha (α) Eğrisi", lblCanvasTitle: "Gelişmiş CFD Rüzgar Tüneli", legLift: "Lift (Kaldırma)", legDrag: "Drag (Direnç)", legChord: "Kamburluk Eğrisi",
                 btnAIAnalyze: "Akış Dinamiklerini Yorumla",
                 aiWelcome: "Merhaba! Seçtiğiniz NACA profiline ve uçuş koşullarına göre oluşan akış ayrılmasını (stall) ve girdapları analiz edebilirim.",
-                aiWait: "Aerodinamik kuvvetler hesaplanıyor..."
+                aiWait: "Akışkanlar mekaniği denklemleri çözülüyor..."
             },
             en: {
-                themeLight: "Light Theme", themeDark: "Dark Theme",
-                unitSI: "Unit: SI (m, m/s)", unitImp: "Unit: Imperial (ft, mph)",
-                lblParams: "Conceptual Design Parameters", lblNaca: "NACA Airfoil Code",
-                ttNaca: "Ex: 2412 (2: Max Camber, 4: Position, 12: Thickness)",
-                lblAoA: "Angle of Attack (AoA)", lblVelocity: "Air Velocity (V)",
-                lblChord: "Chord Length (c)", lblDensity: "Air Density (ρ)", lblSpan: "Wing Span (b)",
-                lblResults: "Aerodynamic Coefficients & Forces", lblLiftForce: "Lift Force",
-                lblDragForce: "Drag Force", lblCL: "Lift Coefficient (C_L)", lblCD: "Drag Coefficient (C_D)",
-                lblEfficiency: "Aerodynamic Efficiency (L/D Ratio)", lblGraphTitle: "C_L vs Alpha (α) Curve",
-                lblCanvasTitle: "Wind Tunnel CFD Visualization", legLift: "Lift Vector", legDrag: "Drag Vector", legChord: "Camber Line",
+                themeLight: "Light Theme", themeDark: "Dark Theme", unitSI: "Unit: SI (m, m/s)", unitImp: "Unit: Imperial (ft, mph)",
+                lblParams: "Conceptual Design Parameters", lblNaca: "NACA Airfoil Code", ttNaca: "Ex: 2412 (2: Max Camber, 4: Position, 12: Thickness)",
+                lblAoA: "Angle of Attack (AoA)", lblVelocity: "Air Velocity (V)", lblChord: "Chord Length (c)", lblDensity: "Air Density (ρ)", lblSpan: "Wing Span (b)",
+                lblResults: "Aerodynamic Coefficients & Forces", lblLiftForce: "Lift Force", lblDragForce: "Drag Force", lblCL: "Lift Coefficient (C_L)", lblCD: "Drag Coefficient (C_D)",
+                lblEfficiency: "Aerodynamic Efficiency (L/D Ratio)", lblGraphTitle: "C_L vs Alpha (α) Curve", lblCanvasTitle: "Advanced CFD Wind Tunnel", legLift: "Lift Vector", legDrag: "Drag Vector", legChord: "Camber Line",
                 btnAIAnalyze: "Analyze Flow Dynamics",
                 aiWelcome: "Hello! I can analyze the flow separation (stall) and wake vortices based on your selected NACA profile and flight conditions.",
-                aiWait: "Calculating aerodynamic forces..."
+                aiWait: "Solving fluid dynamics equations..."
             }
         };
 
-        // INIT
         window.onload = function() {
             canvas = document.getElementById('airfoilCanvas');
             ctx = canvas.getContext('2d');
+            pCanvas = document.getElementById('particleCanvas');
+            pCtx = pCanvas.getContext('2d');
             wrapper = document.getElementById('canvasWrapper');
             graphCanvas = document.getElementById('graphCanvas');
             gCtx = graphCanvas.getContext('2d');
             
-            window.addEventListener('resize', () => { resizeCanvases(); updateSimulation(); initParticles(); });
+            window.addEventListener('resize', () => { resizeCanvases(); window.updateSimulation(); initParticles(); });
             
             applyTranslations();
             resizeCanvases();
             initParticles();
-            updateSimulation(); 
-            animateCFD(); // Animasyon döngüsünü başlat
+            window.updateSimulation(); 
+            animateCFD(); 
         };
 
-        // UNIT & THEME TOGGLES
         window.toggleLang = function() {
             currentLang = currentLang === 'tr' ? 'en' : 'tr';
             document.getElementById('langBtn').innerText = currentLang === 'tr' ? 'TR' : 'EN';
             applyTranslations();
-            updateSimulation();
+            window.updateSimulation();
         };
 
         window.toggleTheme = function() {
             isDarkTheme = !isDarkTheme;
             document.body.classList.toggle('light-theme', !isDarkTheme);
             document.getElementById('themeBtn').innerText = dict[currentLang][isDarkTheme ? 'themeLight' : 'themeDark'];
-            initParticles(); // Parçacık renklerini güncellemek için
-            updateSimulation();
+            initParticles(); 
+            window.updateSimulation();
         };
 
         window.toggleUnit = function() {
@@ -385,7 +375,7 @@
                 document.getElementById('density').value = (d / 0.00194032).toFixed(3);
                 document.getElementById('span').value = (s / 3.28084).toFixed(2);
             }
-            updateSimulation();
+            window.updateSimulation();
         };
 
         function applyTranslations() {
@@ -397,20 +387,28 @@
             document.getElementById('themeBtn').innerText = t[isDarkTheme ? 'themeLight' : 'themeDark'];
             document.getElementById('unitBtn').innerText = t[currentUnit === 'metric' ? 'unitSI' : 'unitImp'];
             document.title = currentLang === 'tr' ? "AeroMech AeroFoil | Flow Dynamics Simulator" : "AeroMech AeroFoil | Simulator";
+            
+            const msgs = document.getElementById('aiMessages');
+            if(msgs && msgs.children.length === 1 && msgs.children[0].classList.contains('msg-bot')) {
+                msgs.children[0].innerHTML = t.aiWelcome;
+            }
         }
 
         function resizeCanvases() {
-            if(wrapper) { canvas.width = wrapper.clientWidth; canvas.height = wrapper.clientHeight; }
+            if(wrapper) { 
+                canvas.width = wrapper.clientWidth; canvas.height = wrapper.clientHeight; 
+                pCanvas.width = wrapper.clientWidth; pCanvas.height = wrapper.clientHeight; 
+            }
             if(graphCanvas) { graphCanvas.width = graphCanvas.clientWidth; graphCanvas.height = graphCanvas.clientHeight; }
         }
 
-        // NACA 4-DIGIT GENERATOR MATH
+        // NACA 4-DIGIT GENERATOR
         function generateNACA(code) {
             if(code.length !== 4 || isNaN(code)) code = "2412";
             
-            const m = parseInt(code[0]) / 100.0; // Maks kamburluk
-            const p = parseInt(code[1]) / 10.0;  // Kamburluk konumu
-            const t = parseInt(code.substring(2, 4)) / 100.0; // Kalınlık
+            const m = parseInt(code[0]) / 100.0; 
+            const p = parseInt(code[1]) / 10.0;  
+            const t = parseInt(code.substring(2, 4)) / 100.0; 
             
             let upper = [], lower = [], camber = [];
             const numPoints = 100;
@@ -445,7 +443,20 @@
             return { upper, lower, camber, m, p, t };
         }
 
-        // MAIN SIMULATION UPDATE (Fiziksel Değerler)
+        // KANAT ÜZERİNDE HASSAS KOORDİNAT BULUCU (Akışkanların yüzeye yapışması için)
+        function getAirfoilY(nx) {
+            if(nx <= 0) return { uy: 0, ly: 0 };
+            if(nx >= 1) return { uy: 0, ly: 0 };
+            
+            let bestIdx = 0; let minDist = 999;
+            for(let i=0; i<airfoilCoords.upper.length; i++) {
+                let dist = Math.abs(airfoilCoords.upper[i].x - nx);
+                if(dist < minDist) { minDist = dist; bestIdx = i; }
+            }
+            return { uy: airfoilCoords.upper[bestIdx].y, ly: airfoilCoords.lower[bestIdx].y };
+        }
+
+        // FİZİK & MATEMATİK GÜNCELLEMESİ (Gerçek Zamanlı)
         window.updateSimulation = function() {
             let code = document.getElementById('nacaCode').value;
             let aoa = parseFloat(document.getElementById('aoaSlider').value);
@@ -458,29 +469,25 @@
             
             airfoilCoords = generateNACA(code);
             
-            // DİNAMİK STALL AÇISI HESAPLAMASI (Kalınlık ve Kamburluğa Göre)
-            // Kalın profiller daha geç stall olur. Kamburluk da stall karakteristiğini etkiler.
-            // Ampirik formül: Stall Açısı ≈ 10 + (kalınlık * 40) - (kamburluk * 20)
+            // DİNAMİK STALL AÇISI: Kalın ve az kambur profiller daha geç stall olur.
+            // Ampirik kural: ~ 10° + (Kalınlık * 40) - (Kamburluk * 20)
             let dynStallAngle = 10 + (airfoilCoords.t * 40) - (airfoilCoords.m * 20);
+            if(dynStallAngle < 8) dynStallAngle = 8;
             
-            // Sıfır Kaldırma Açısı
             let alphaL0_deg = airfoilCoords.m === 0 ? 0 : -50.6 * airfoilCoords.m;
             let cl_slope = 2 * Math.PI * (Math.PI/180); 
             
             currentStats.stallAngle = dynStallAngle;
-            currentStats.stall = (aoa > dynStallAngle || aoa < -dynStallAngle); // Negatif stall
+            currentStats.stall = (aoa > dynStallAngle || aoa < -dynStallAngle);
             
-            // Kaldırma (Lift) Katsayısı
             let cl = 0;
             if(!currentStats.stall) {
                 cl = cl_slope * (aoa - alphaL0_deg);
             } else {
-                // Post-stall (Tutunma kaybı sonrası dramatik düşüş)
-                if(aoa > 0) cl = cl_slope * (dynStallAngle - alphaL0_deg) * Math.max(0.2, 1 - (aoa - dynStallAngle)*0.15);
-                else cl = cl_slope * (-dynStallAngle - alphaL0_deg) * Math.max(0.2, 1 - Math.abs(aoa + dynStallAngle)*0.15);
+                if(aoa > 0) cl = cl_slope * (dynStallAngle - alphaL0_deg) * Math.max(0.1, 1 - (aoa - dynStallAngle)*0.15);
+                else cl = cl_slope * (-dynStallAngle - alphaL0_deg) * Math.max(0.1, 1 - Math.abs(aoa + dynStallAngle)*0.15);
             }
             
-            // Sürüklenme (Drag) Katsayısı (Kalınlık bazlı temel + İndüklenmiş + Stall Form Drag)
             let cd0 = 0.005 + (airfoilCoords.t * 0.05); 
             let AR = s / c; 
             let e = 0.8; 
@@ -488,11 +495,10 @@
             let stall_drag = currentStats.stall ? Math.pow(Math.abs(aoa) - dynStallAngle + 5, 1.5) * 0.01 : 0; 
             let cd = cd0 + cd_induced + stall_drag;
             
-            // Kuvvet Hesapları
-            let v_calc = currentUnit === 'metric' ? v : (v * 0.44704); // mph to m/s
-            let d_calc = currentUnit === 'metric' ? d : (d * 515.378); // slugs/ft3 to kg/m3
-            let c_calc = currentUnit === 'metric' ? c : (c * 0.3048);  // ft to m
-            let s_calc = currentUnit === 'metric' ? s : (s * 0.3048);  // ft to m
+            let v_calc = currentUnit === 'metric' ? v : (v * 0.44704); 
+            let d_calc = currentUnit === 'metric' ? d : (d * 515.378); 
+            let c_calc = currentUnit === 'metric' ? c : (c * 0.3048);  
+            let s_calc = currentUnit === 'metric' ? s : (s * 0.3048);  
 
             let q = 0.5 * d_calc * Math.pow(v_calc, 2); 
             let area = c_calc * s_calc;
@@ -500,9 +506,8 @@
             let lift = q * area * cl;
             let drag = q * area * cd;
             
-            // Imperial'a geri dönüş (Kuvvet gösterimi için)
             if(currentUnit === 'imperial') {
-                lift = lift * 0.224809; // N to lbf
+                lift = lift * 0.224809; 
                 drag = drag * 0.224809;
             }
 
@@ -510,7 +515,6 @@
             
             currentStats = { cl, cd, lift, drag, ld, stall: currentStats.stall, aoaL0: alphaL0_deg, stallAngle: dynStallAngle };
             
-            // UI Güncelleme
             let fUnit = currentUnit === 'metric' ? ' N' : ' lbf';
             document.getElementById('statLift').innerText = lift.toFixed(1) + fUnit;
             document.getElementById('statDrag').innerText = drag.toFixed(1) + fUnit;
@@ -524,110 +528,165 @@
                 document.getElementById('cardDrag').style.borderColor = 'var(--danger)';
             } else {
                 document.getElementById('cardLift').style.borderColor = 'var(--lift)';
-                document.getElementById('cardDrag').style.borderColor = 'var(--danger)';
+                document.getElementById('cardDrag').style.borderColor = 'var(--border)';
             }
             
+            drawAirfoilVectors();
             drawGraph(aoa);
         };
 
-        // AKIŞKAN PARÇACIKLARI (CFD) BAŞLATMA
+        // AKIŞKAN PARÇACIKLARININ (CFD) OLUŞTURULMASI
         function initParticles() {
             particles = [];
-            if(!canvas) return;
-            const windColor = getComputedStyle(document.body).getPropertyValue('--wind-color').trim() || 'rgba(56, 189, 248, 0.4)';
+            if(!pCanvas) return;
+            const rgb = getComputedStyle(document.body).getPropertyValue('--wind-base').trim() || '56, 189, 248';
             for(let i=0; i<NUM_PARTICLES; i++) {
                 particles.push({
-                    x: Math.random() * canvas.width,
-                    y: Math.random() * canvas.height,
-                    vx: 4 + Math.random() * 2,
-                    vy: 0,
-                    life: Math.random() * 100,
-                    color: windColor
+                    x: Math.random() * pCanvas.width,
+                    y: Math.random() * pCanvas.height,
+                    vx: 0, vy: 0,
+                    bl_offset: Math.random() * 40 - 20, // Sınır tabaka mesafesi rastgeleliği
+                    rgb: rgb
                 });
             }
         }
 
-        // AKIŞKAN PARÇACIKLARI VE KANAT RENDER DÖNGÜSÜ
+        // AKIŞKAN FİZİK MOTORU (Sınır Tabaka ve Stall Girdapları)
         function animateCFD() {
-            if(!ctx || !canvas) return;
+            if(!pCtx || !pCanvas) return;
             
-            // Arka planı sil (hafif trail (kuyruk) efekti için tam silmiyoruz)
-            ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--bg').trim();
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // Motion Blur efekti (Kuyruk bırakma)
+            pCtx.fillStyle = isDarkTheme ? 'rgba(11, 17, 32, 0.2)' : 'rgba(248, 250, 252, 0.2)';
+            pCtx.fillRect(0, 0, pCanvas.width, pCanvas.height);
             
-            const cx = canvas.width / 2;
-            const cy = canvas.height / 2;
-            const scale = Math.min(canvas.width, canvas.height) * 0.6; 
-            const aoa_rad = -parseFloat(document.getElementById('aoaSlider').value) * Math.PI / 180;
-            const isStalled = currentStats.stall;
+            const cx = pCanvas.width / 2;
+            const cy = pCanvas.height / 2;
+            const scale = Math.min(pCanvas.width, pCanvas.height) * 0.6; 
+            
+            let aoa_deg = parseFloat(document.getElementById('aoaSlider').value) || 0;
+            const aoa_rad = -aoa_deg * Math.PI / 180;
             const chordPx = 1.0 * scale; 
+            
+            // Hız ve Yoğunluk görsel etkisi
+            let v_input = parseFloat(document.getElementById('velocity').value) || 1;
+            let d_input = parseFloat(document.getElementById('density').value) || 1;
+            let baseSpeed = Math.max(3, v_input * 0.1); 
+            let opacity = Math.min(0.9, Math.max(0.1, d_input * 0.4)); // Yoğunluk arttıkça çizgiler belirginleşir
 
-            // PARÇACIK FİZİĞİ (Girdaplar ve Coanda Etkisi)
-            ctx.lineWidth = 1.5;
+            // Separation (Ayrılma) Noktası Hesaplaması
+            let sepPoint = 1.0;
+            if(aoa_deg > currentStats.stallAngle) {
+                sepPoint = Math.max(0.05, 1.0 - (aoa_deg - currentStats.stallAngle) * 0.15);
+            } else if (aoa_deg < -currentStats.stallAngle) {
+                sepPoint = Math.max(0.05, 1.0 - Math.abs(aoa_deg + currentStats.stallAngle) * 0.15);
+            }
+
+            pCtx.lineWidth = 1.5;
+            
             for(let i=0; i<particles.length; i++) {
                 let p = particles[i];
+                let local_vx = baseSpeed;
+                let local_vy = 0;
                 
-                // Base Flow
-                p.vx = 6; p.vy = 0;
-                
-                // Parçacığın kanat merkezine göre yerel koordinatları (Döndürülmüş)
                 let dx = p.x - cx;
                 let dy = p.y - cy;
                 
-                // Ters rotasyon ile yerel (local) kanat uzayına geçiş
+                // Parçacığı kanat düzlemine (Local coordinates) çevir
                 let lx = dx * Math.cos(-aoa_rad) - dy * Math.sin(-aoa_rad);
                 let ly = dx * Math.sin(-aoa_rad) + dy * Math.cos(-aoa_rad);
                 
-                // Kanat sınırları içinde mi? (Leading edge to Trailing edge)
-                if (lx > -chordPx*0.25 && lx < chordPx*0.75) {
-                    // Kalınlık simülasyonu (Akışı yukarı/aşağı it)
-                    let distY = Math.abs(ly);
-                    if (distY < chordPx * 0.3) {
-                        let push = (chordPx * 0.3 - distY) * 0.05;
-                        if(ly > 0) p.vy += push; else p.vy -= push;
+                let nx = lx / chordPx + 0.25; 
+                
+                // Kanat Çevresi Fizik Motoru
+                if (nx > -0.2 && nx < 1.1) {
+                    let {uy, ly: lowY} = getAirfoilY(nx < 0 ? 0.01 : (nx > 1 ? 0.99 : nx));
+                    let uy_px = -uy * scale; // Canvas Y ters
+                    let ly_px = -lowY * scale;
+                    
+                    let bl_zone = 50; 
+                    
+                    if (ly > uy_px - bl_zone && ly < ly_px + bl_zone) {
+                        // Çarpışma Önleme (Solid Body)
+                        if (ly > uy_px && ly < ly_px) {
+                            if (Math.abs(ly - uy_px) < Math.abs(ly - ly_px)) ly = uy_px - 2;
+                            else ly = ly_px + 2;
+                        }
+                        
+                        // SINIR TABAKA (Boundary Layer) UYUMU
+                        if (ly <= uy_px) {
+                            // Üst Yüzey
+                            if (nx <= sepPoint || aoa_deg < -currentStats.stallAngle) {
+                                // Yapışık Akış (Coanda)
+                                local_vy = (uy_px - Math.abs(p.bl_offset) - ly) * 0.2;
+                                local_vx *= 1.2; // Üstten hava hızlanır (Bernoulli)
+                            } else {
+                                // Ayrılmış Akış (Stall Vortices)
+                                local_vx *= 0.3; 
+                                local_vy += (Math.random() - 0.5) * 4; 
+                                local_vx -= Math.sin(ly * 0.1) * 3;
+                                local_vy += Math.cos(lx * 0.1) * 3;
+                            }
+                        } else {
+                            // Alt Yüzey
+                            if (aoa_deg < -currentStats.stallAngle && nx > sepPoint) {
+                                // Ters stall girdabı
+                                local_vx *= 0.3; 
+                                local_vy += (Math.random() - 0.5) * 4; 
+                            } else {
+                                local_vy = (ly_px + Math.abs(p.bl_offset) - ly) * 0.2;
+                            }
+                        }
                     }
-                    // Coanda Etkisi (Akışın kanada yapışması)
-                    if(!isStalled) {
-                        p.vy -= Math.sin(aoa_rad) * 2; 
-                    }
-                } 
-                // Firar Kenarı (Trailing Edge) ve Wake (İz) Bölgesi
-                else if (lx >= chordPx*0.75) {
-                    if (isStalled) {
-                        // STALL GİRDAPLARI (Vortices)
-                        let distFromTE = lx - chordPx*0.75;
-                        if(Math.abs(ly) < chordPx * 0.6) {
-                            // Türbülans Ekle
-                            p.vy += (Math.random() - 0.5) * (distFromTE * 0.05);
-                            p.vx -= Math.random() * (distFromTE * 0.01);
-                            // Girdap dönüşü
-                            p.vx += Math.sin(p.y * 0.05) * 2;
-                            p.vy += Math.cos(p.x * 0.05) * 2;
+                } else if (nx >= 1.1) {
+                    // İZ BÖLGESİ (Wake)
+                    if (currentStats.stall) {
+                        if (Math.abs(ly) < scale * 0.5) {
+                            local_vx *= 0.6;
+                            local_vy += (Math.random() - 0.5) * 2;
+                            local_vx += Math.sin(ly * 0.05) * 2;
+                            local_vy += Math.cos(lx * 0.05) * 2;
                         }
                     } else {
-                        // Temiz İz (Smooth Wake) - Downwash etkisi
-                        p.vy += Math.sin(aoa_rad) * 1.5;
+                        // Downwash (Aşağı doğru akış)
+                        local_vy += Math.sin(aoa_rad) * baseSpeed * 0.8; 
                     }
                 }
 
+                // Lokal Hızları Globale Çevir
+                p.vx = local_vx * Math.cos(aoa_rad) - local_vy * Math.sin(aoa_rad);
+                p.vy = local_vx * Math.sin(aoa_rad) + local_vy * Math.cos(aoa_rad);
+                
                 p.x += p.vx;
                 p.y += p.vy;
 
                 // Ekrandan çıkarsa başa sar
-                if(p.x > canvas.width || p.y < 0 || p.y > canvas.height || p.vx < 0) {
+                if(p.x > pCanvas.width || p.y < -100 || p.y > pCanvas.height + 100 || p.vx < -5) {
                     p.x = 0;
-                    p.y = Math.random() * canvas.height;
+                    p.y = Math.random() * pCanvas.height;
                 }
 
-                // Parçacığı Çiz
-                ctx.beginPath();
-                ctx.moveTo(p.x - p.vx*2, p.y - p.vy*2);
-                ctx.lineTo(p.x, p.y);
-                ctx.strokeStyle = p.color;
-                ctx.stroke();
+                // Çiz
+                pCtx.beginPath();
+                pCtx.moveTo(p.x - p.vx*1.5, p.y - p.vy*1.5);
+                pCtx.lineTo(p.x, p.y);
+                pCtx.strokeStyle = `rgba(${p.rgb}, ${opacity})`;
+                pCtx.stroke();
             }
 
-            // KANAT PROFİLİ ÇİZİMİ
+            animationFrameId = requestAnimationFrame(animateCFD);
+        }
+
+        // KANAT VE VEKTÖR ÇİZİMİ
+        function drawAirfoilVectors() {
+            if(!ctx || !canvas) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            const scale = Math.min(canvas.width, canvas.height) * 0.6; 
+            let aoa_deg = parseFloat(document.getElementById('aoaSlider').value) || 0;
+            const aoa_rad = -aoa_deg * Math.PI / 180;
+            
             ctx.save();
             ctx.translate(cx, cy);
             ctx.scale(1, -1);
@@ -660,25 +719,21 @@
             ctx.setLineDash([5, 5]);
             ctx.stroke();
             ctx.setLineDash([]);
+            
             ctx.restore();
 
-            // KUVVET VEKTÖRLERİ (Lift & Drag) - Kanat rotasyonundan bağımsız, akışa dik/paralel
+            // KUVVET VEKTÖRLERİ (Lift & Drag) - Kanattan bağımsız, akışa dik
             let maxVecLen = scale * 0.8;
-            let maxGraphCL = 2.0; 
-            let liftLen = (Math.abs(currentStats.cl) / maxGraphCL) * maxVecLen; 
-            let dragLen = (currentStats.cd / 0.3) * maxVecLen * 0.5; // Drag vizüel olarak abartılır
+            let liftLen = (Math.abs(currentStats.cl) / 2.0) * maxVecLen; 
+            let dragLen = (currentStats.cd / 0.3) * maxVecLen * 0.5; 
             
-            // Lift Vektörü (Yukarı/Aşağı)
             if(liftLen > 5) {
                 let dirY = currentStats.cl > 0 ? -1 : 1;
                 drawArrow(ctx, cx, cy, cx, cy + dirY * liftLen, getComputedStyle(document.body).getPropertyValue('--lift').trim());
             }
-            // Drag Vektörü (Sağa)
             if(dragLen > 5) {
                 drawArrow(ctx, cx, cy, cx + dragLen, cy, getComputedStyle(document.body).getPropertyValue('--danger').trim());
             }
-
-            animationFrameId = requestAnimationFrame(animateCFD);
         }
 
         function drawArrow(context, fromx, fromy, tox, toy, color) {
@@ -702,7 +757,6 @@
             const h = graphCanvas.height;
             gCtx.clearRect(0, 0, w, h);
             
-            // Axes
             gCtx.beginPath();
             gCtx.moveTo(0, h/2); gCtx.lineTo(w, h/2); 
             gCtx.moveTo(w/2, 0); gCtx.lineTo(w/2, h); 
@@ -710,7 +764,6 @@
             gCtx.lineWidth = 1;
             gCtx.stroke();
             
-            // Plot C_L from -10 to +25
             let minA = -10, maxA = 25;
             let cl_slope = 2 * Math.PI * (Math.PI/180);
             let dynStall = currentStats.stallAngle;
@@ -719,11 +772,11 @@
             for(let a = minA; a <= maxA; a++) {
                 let cl = 0;
                 if(a <= dynStall && a >= -dynStall) cl = cl_slope * (a - currentStats.aoaL0);
-                else if (a > dynStall) cl = cl_slope * (dynStall - currentStats.aoaL0) * Math.max(0.2, 1 - (a - dynStall)*0.15);
-                else if (a < -dynStall) cl = cl_slope * (-dynStall - currentStats.aoaL0) * Math.max(0.2, 1 - Math.abs(a + dynStall)*0.15);
+                else if (a > dynStall) cl = cl_slope * (dynStall - currentStats.aoaL0) * Math.max(0.1, 1 - (a - dynStall)*0.15);
+                else if (a < -dynStall) cl = cl_slope * (-dynStall - currentStats.aoaL0) * Math.max(0.1, 1 - Math.abs(a + dynStall)*0.15);
                 
                 let px = ((a - minA) / (maxA - minA)) * w;
-                let py = h/2 - (cl / 2.0) * (h/2); // scale C_L=2.0 to top
+                let py = h/2 - (cl / 2.0) * (h/2);
                 
                 if(a === minA) gCtx.moveTo(px, py);
                 else gCtx.lineTo(px, py);
@@ -732,7 +785,6 @@
             gCtx.lineWidth = 2;
             gCtx.stroke();
             
-            // Mark Current Point
             let curPx = ((currentAoA - minA) / (maxA - minA)) * w;
             let curPy = h/2 - (currentStats.cl / 2.0) * (h/2);
             gCtx.beginPath();
